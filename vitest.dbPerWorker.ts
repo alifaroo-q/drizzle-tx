@@ -1,7 +1,7 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { inject } from 'vitest';
-import { relations, schema } from './test/schema.js';
+import { relations } from './test/schema.js';
 
 export interface TestDb {
   db: NodePgDatabase<typeof relations>;
