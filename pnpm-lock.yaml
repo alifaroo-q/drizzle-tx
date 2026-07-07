@@ -86,6 +86,9 @@ importers:
       '@arethetypeswrong/cli':
         specifier: ^0.18.4
         version: 0.18.4
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.2
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.0
