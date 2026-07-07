@@ -12,6 +12,11 @@ export default defineConfig({
       },
     }),
   ],
+  // Vite 8 / Vitest 4 transform TypeScript with Oxc by default, which strips type
+  // annotations BEFORE unplugin-swc runs — leaving SWC's `decoratorMetadata` with no
+  // types, so `design:paramtypes` emits as `[undefined]` and type-based DI breaks.
+  // Disabling Oxc makes unplugin-swc the sole transformer (emitDecoratorMetadata works).
+  oxc: false,
   test: {
     name: 'nestjs',
     globals: true,
