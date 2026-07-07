@@ -1,5 +1,6 @@
 import {
   type DrizzleTxError,
+  err,
   hostNotInitialized,
   type Propagation,
   type Result,
@@ -36,7 +37,7 @@ export function Transactional(propagation?: Propagation) {
       apply(target, thisArg, args: A) {
         const host = TransactionHost.get();
         if (!host) {
-          return Promise.resolve({ ok: false as const, error: hostNotInitialized(undefined) });
+          return Promise.resolve(err(hostNotInitialized(undefined)));
         }
         const bound = (): Promise<Result<T, E>> =>
           Reflect.apply(target, thisArg, args) as Promise<Result<T, E>>;

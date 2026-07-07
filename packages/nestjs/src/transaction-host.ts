@@ -3,6 +3,7 @@ import type {
   Propagation,
   Result,
   TransactionManager,
+  TransactionWork,
   TxOptions,
 } from '@drizzle-tx/core';
 import { Inject, Injectable } from '@nestjs/common';
@@ -32,13 +33,34 @@ export class TransactionHost {
     return this.#manager.isTransactionActive();
   }
 
+  // Overloads mirror TransactionManager.withTransaction so callers keep full type safety.
+  withTransaction<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
-    a: Propagation | TxOptions | (() => Promise<Result<T, E>>),
-    b?: TxOptions | (() => Promise<Result<T, E>>),
-    c?: () => Promise<Result<T, E>>,
+    propagation: Propagation,
+    work: TransactionWork<T, E>,
+  ): Promise<Result<T, E | DrizzleTxError>>;
+  withTransaction<T, E>(
+    options: TxOptions,
+    work: TransactionWork<T, E>,
+  ): Promise<Result<T, E | DrizzleTxError>>;
+  withTransaction<T, E>(
+    propagation: Propagation,
+    options: TxOptions,
+    work: TransactionWork<T, E>,
+  ): Promise<Result<T, E | DrizzleTxError>>;
+  withTransaction<T, E>(
+    a: Propagation | TxOptions | TransactionWork<T, E>,
+    b?: TxOptions | TransactionWork<T, E>,
+    c?: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
-    // Delegate all overloads to the manager.
-    // biome-ignore lint/suspicious/noExplicitAny: overload dispatch is delegated wholesale to the manager
-    return (this.#manager.withTransaction as any)(a, b, c);
+    // Forward the variadic overload args to the manager. Overloaded functions can't be
+    // called with union-typed args, so the method is cast to a single precise call
+    // signature (not `any`) — the Result return type is preserved end-to-end. Kept as a
+    // member-call expression so `this` stays bound to the manager.
+    return (
+      this.#manager.withTransaction as (
+        ...args: unknown[]
+      ) => Promise<Result<T, E | DrizzleTxError>>
+    )(a, b, c);
   }
 }

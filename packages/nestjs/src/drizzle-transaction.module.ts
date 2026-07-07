@@ -4,7 +4,14 @@ import {
   type DrizzleTxCapable,
   TransactionManager,
 } from '@drizzle-tx/core';
-import { type DynamicModule, Global, Module } from '@nestjs/common';
+import {
+  type DynamicModule,
+  type FactoryProvider,
+  Global,
+  Module,
+  type ModuleMetadata,
+  type Provider,
+} from '@nestjs/common';
 import { DRIZZLE_BASE_DB, DRIZZLE_TX_CLIENT, DRIZZLE_TX_MANAGER } from './tokens.js';
 import { TransactionHost } from './transaction-host.js';
 
@@ -12,12 +19,10 @@ export interface DrizzleTransactionModuleOptions {
   readonly drizzle: DrizzleTxCapable;
 }
 export interface DrizzleTransactionModuleAsyncOptions {
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS module metadata (imports/inject) is untyped by convention
-  readonly imports?: any[];
-  // biome-ignore lint/suspicious/noExplicitAny: NestJS injection tokens are heterogeneous
-  readonly inject?: any[];
+  readonly imports?: ModuleMetadata['imports'];
+  readonly inject?: FactoryProvider['inject'];
   readonly useFactory: (
-    // biome-ignore lint/suspicious/noExplicitAny: factory args match the injected providers
+    // biome-ignore lint/suspicious/noExplicitAny: injected factory args are heterogeneous (NestJS convention)
     ...args: any[]
   ) => DrizzleTransactionModuleOptions | Promise<DrizzleTransactionModuleOptions>;
 }
@@ -36,7 +41,7 @@ export class DrizzleTransactionModule {
     return DrizzleTransactionModule.build(
       {
         provide: DRIZZLE_BASE_DB,
-        // biome-ignore lint/suspicious/noExplicitAny: factory args match the injected providers
+        // biome-ignore lint/suspicious/noExplicitAny: injected factory args are heterogeneous (NestJS convention)
         useFactory: async (...args: any[]) => (await options.useFactory(...args)).drizzle,
         inject: options.inject ?? [],
       },
@@ -47,8 +52,10 @@ export class DrizzleTransactionModule {
   // A class decorated with @Global()/@Module() cannot have a `static #private`
   // member under experimentalDecorators (TS18036), so this internal helper uses
   // TS-level `private` instead of a hard-private `#` identifier.
-  // biome-ignore lint/suspicious/noExplicitAny: provider shape varies (useValue vs useFactory)
-  private static build(baseDbProvider: any, imports: any[]): DynamicModule {
+  private static build(
+    baseDbProvider: Provider,
+    imports: ModuleMetadata['imports'],
+  ): DynamicModule {
     return {
       module: DrizzleTransactionModule,
       imports,
