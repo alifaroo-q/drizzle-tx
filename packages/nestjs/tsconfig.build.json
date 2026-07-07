@@ -1,0 +1,20 @@
+{
+  // Emit config for `@drizzle-tx/nestjs`. This is what the `build` script runs and what the
+  // root `tsc -b` solution references (references must be `composite`). It excludes every
+  // test flavor so only shippable `src` lands in `dist`, and it pins node16 CJS emit — this
+  // package ships CommonJS (`"type": "commonjs"`), so without overriding the editor config's
+  // bundler resolution the inherited `module: "preserve"` would emit ESM into a CJS package
+  // (publint "ESM interpreted as CJS"). The editor never uses this file — see `tsconfig.json`
+  // for why the editor config is a non-composite `noEmit` superset that also owns the tests.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "composite": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["**/*.test.ts", "**/*.integration.test.ts", "**/*.test-d.ts", "dist"]
+}

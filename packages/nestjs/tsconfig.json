@@ -1,17 +1,43 @@
 {
+  // Editor + typecheck config. This is the config tsserver auto-discovers for every file
+  // under `packages/nestjs/src` — INCLUDING `*.integration.test.ts`. It must apply
+  // `experimentalDecorators` to those test files, otherwise the editor puts them in an
+  // inferred project (no experimentalDecorators) and legacy 3-arg decorators like
+  // `@Transactional` fail with TS1241 ("runtime will invoke the decorator with 2
+  // arguments, but the decorator expects 3"). The root `tsconfig.test.json` fixes the CLI
+  // typecheck but tsserver never reads it (it only discovers `tsconfig.json`).
+  //
+  // Why this shape (and not a composite test project + project references — the more
+  // "canonical" TS pattern): `@drizzle-tx/core` is built by tsdown into a single bundled
+  // `index.d.ts`, NOT by tsc into per-file composite declarations. Project references
+  // require tsc-emitted per-file output to redirect into, so a composite test project that
+  // references the packages fails with TS6305/TS6310 under the repo's load-bearing
+  // `tsc -b --noEmit` typecheck. So test ownership is handled per-package here instead.
+  //
+  // `noEmit` + non-composite (no `rootDir`) on purpose: the integration tests import the
+  // shared harness (`../../test/**`, `../../vitest.*`) which lives OUTSIDE `src`, so a
+  // `rootDir: "src"` emit config would reject those imports with TS6059. Emit is handled by
+  // the sibling `tsconfig.build.json` (node16, `rootDir: src`, excludes tests), which is
+  // what the `build` script and the root `tsc -b` solution reference.
+  //
+  // `moduleResolution: bundler` (not node16): the integration tests statically import the
+  // ESM harness, but this package is `"type": "commonjs"`, so node16 would flag them TS1479
+  // ("cannot require an ES module"). Those tests never run under Node's CJS resolver —
+  // vitest (SWC) bundles them — so bundler mode models their real runtime. Strict node16
+  // CJS semantics for the shipped `src` are enforced by `tsconfig.build.json`.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
-    "module": "node16",
-    "moduleResolution": "node16",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
     "esModuleInterop": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "composite": false,
+    "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["**/*.test.ts", "**/*.integration.test.ts", "**/*.test-d.ts", "dist"]
+  "exclude": ["**/*.test-d.ts", "dist"]
 }

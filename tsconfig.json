@@ -1,4 +1,4 @@
 {
   "files": [],
-  "references": [{ "path": "packages/core" }, { "path": "packages/nestjs" }]
+  "references": [{ "path": "packages/core" }, { "path": "packages/nestjs/tsconfig.build.json" }]
 }
