@@ -17,8 +17,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm typecheck
+      # Build first: @drizzle-tx/nestjs typechecks against @drizzle-tx/core's built
+      # dist/*.d.ts (resolved via its exports map), so core must be built beforehand.
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test # Docker preinstalled on ubuntu runners → Testcontainers works
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
