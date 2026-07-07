@@ -21,7 +21,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rimraf dist && tsc -p tsconfig.json",
+    "build": "rimraf dist tsconfig.tsbuildinfo && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test-d.json",
     "check:publish": "pnpm build && publint --strict && attw --pack ."
   },
