@@ -91,11 +91,11 @@ Isolation/access-mode `TxOptions` apply only when **starting a new top-level tra
 
 ## Controllers are the throw boundary
 
-Services return `Result`; **controllers** unwrap it and are the only place a throw happens — exhaustively matching `err` to an `HttpException`. `assertNever` makes the match compile-time exhaustive: add a `DrizzleTxError` variant and every controller stops compiling until it handles it.
+Services return `Result`; **controllers** unwrap it and are the only place a throw happens — exhaustively matching `err` to an `HttpException`. `matchError` makes the match compile-time exhaustive: add a `DrizzleTxError` variant and every controller stops compiling until it handles it (it's `switch` + `assertNever` in expression form).
 
 ```ts
 import { Controller, Post, Body, ConflictException, ServiceUnavailableException, InternalServerErrorException } from '@nestjs/common';
-import { isOk, assertNever } from '@drizzle-tx/nestjs';
+import { isOk, matchError } from '@drizzle-tx/nestjs';
 
 @Controller('users')
 export class UserController {
@@ -105,25 +105,31 @@ export class UserController {
   async signup(@Body('name') name: string) {
     const result = await this.billing.signup(name);
     if (isOk(result)) return { id: result.value };
+    if (result.error === 'DUPLICATE') throw new ConflictException('user already exists');
 
-    const e = result.error;
-    if (e === 'DUPLICATE') throw new ConflictException('user already exists');
-
-    // e is now DrizzleTxError — matched exhaustively.
-    switch (e.kind) {
-      case 'PoolConnectionTimeout':
-        throw new ServiceUnavailableException('database busy, retry');
-      case 'TransactionAborted':
-        throw new InternalServerErrorException('transaction aborted');
-      case 'HostNotInitialized':
-        throw new InternalServerErrorException('transaction host not ready');
-      case 'NotPoolBacked':
-        throw new InternalServerErrorException('REQUIRES_NEW needs a Pool-backed db');
-      default:
-        return assertNever(e);
-    }
+    // result.error is now DrizzleTxError — matched exhaustively (omit a kind → compile error).
+    throw matchError(result.error, {
+      PoolConnectionTimeout: () => new ServiceUnavailableException('database busy, retry'),
+      TransactionAborted: () => new InternalServerErrorException('transaction aborted'),
+      HostNotInitialized: () => new InternalServerErrorException('transaction host not ready'),
+      NotPoolBacked: () => new InternalServerErrorException('REQUIRES_NEW needs a Pool-backed db'),
+    });
   }
 }
+```
+
+## Result combinators
+
+Dependency-free, tree-shakable helpers over `Result` (import from either package). Consumers depend only on the `Result` *type* — the helpers are opt-in:
+
+```ts
+import { ok, err, map, mapErr, andThen, unwrapOr, match } from '@drizzle-tx/core';
+
+map(ok(2), (n) => n * 10);              // ok(20)          — transform the value
+mapErr(err('E'), (e) => `${e}!`);        // err('E!')       — transform the error
+andThen(ok(1), (n) => ok(n + 1));        // ok(2)           — chain a fallible step (errors union)
+unwrapOr(result, fallback);              // T               — value or fallback
+match(result, { ok: (v) => …, err: (e) => … }); // fold both channels
 ```
 
 ## Imperative API
@@ -138,6 +144,20 @@ const result = await host.withTransaction(async () => {
 ```
 
 `host.tx` exposes the current active-transaction client; `host.isTransactionActive()` reports whether one is open.
+
+## Scope-based transactions (`await using`)
+
+For imperative flows that prefer explicit resource management over a callback, `begin()` returns an `AsyncDisposable` scope. It **rolls back on scope exit unless you call `commit()`** (default-deny), and returns `err(...)` — never throws — if the transaction can't start:
+
+```ts
+const opened = await host.begin(); // or manager.begin() in core
+if (!opened.ok) return opened;     // infra error, handled as a value
+await using scope = opened.value;
+await scope.tx.insert(users).values({ name: 'Ada' }); // explicit tx client
+scope.commit();                    // omit (or early-return / throw) → rollback
+```
+
+> **Caveat — no implicit propagation.** A `using` scope does **not** establish the AsyncLocalStorage context (that needs a callback; `enterWith` is forbidden by ADR-0001), so the injected `DRIZZLE_TX_CLIENT` proxy will **not** auto-join it — pass `scope.tx` explicitly. For implicit propagation across repositories, use `withTransaction` / `@Transactional`. Also: the connection is held for the scope's lifetime (pool-sizing caveats apply), and a commit/rollback failure *at dispose* is logged rather than returned (dispose can't throw in the no-throw model) — use `withTransaction` when you must handle that as a value. Requires a runtime with `Symbol.asyncDispose` (Node ≥ 20.4).
 
 ## Self-invocation works
 

@@ -19,10 +19,10 @@ Peers: `@nestjs/common`, `@nestjs/core`, `reflect-metadata`, `rxjs`, `drizzle-or
 - `DrizzleTransactionModule.forRoot({ drizzle })` / `.forRootAsync({ inject, useFactory })`
 - `DRIZZLE_TX_CLIENT` — inject the transparent transactional client
 - `@Transactional(propagation?)` — method decorator (returns `Result`, never throws)
-- `TransactionHost` — imperative `withTransaction()` / `tx` / `isTransactionActive()`
+- `TransactionHost` — imperative `withTransaction()` / `begin()` (`await using` scope) / `tx` / `isTransactionActive()`
 - `InjectTransactionalClient()` — shorthand for `@Inject(DRIZZLE_TX_CLIENT)`
 - `DRIZZLE_TX_MANAGER`, `DRIZZLE_BASE_DB` — advanced tokens
-- Re-exported from core: `Propagation`, `ok`, `err`, `isOk`, `isErr`, `assertNever`, and the `Result`, `DrizzleTxError`, `TxOptions` types
+- Re-exported from core: `Propagation`, `ok`, `err`, `isOk`, `isErr`, `assertNever`, the combinators `map`/`mapErr`/`andThen`/`unwrapOr`/`match`, `matchError`, and the `Result`, `DrizzleTxError`, `DrizzleTxErrorKind`, `TransactionScope`, `TxOptions` types
 
 ## Usage
 

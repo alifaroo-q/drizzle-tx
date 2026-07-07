@@ -1,6 +1,26 @@
-export type { DrizzleTxError, Result, TxOptions } from '@drizzle-tx/core';
+export type {
+  DrizzleTxError,
+  DrizzleTxErrorKind,
+  Result,
+  TransactionScope,
+  TransactionWork,
+  TxOptions,
+} from '@drizzle-tx/core';
 // Re-export the Result/propagation surface so consumers import from one place.
-export { assertNever, err, isErr, isOk, ok, Propagation } from '@drizzle-tx/core';
+export {
+  andThen,
+  assertNever,
+  err,
+  isErr,
+  isOk,
+  map,
+  mapErr,
+  match,
+  matchError,
+  ok,
+  Propagation,
+  unwrapOr,
+} from '@drizzle-tx/core';
 export type {
   DrizzleTransactionModuleAsyncOptions,
   DrizzleTransactionModuleOptions,

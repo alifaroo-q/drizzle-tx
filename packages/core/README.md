@@ -14,12 +14,13 @@ pnpm add @drizzle-tx/core drizzle-orm pg
 
 ## What's in the box
 
-- `TransactionManager` — the `AsyncLocalStorage` engine + the `REQUIRED` / `REQUIRES_NEW` / `NESTED` propagation switch, plus rollback-via-`err`.
+- `TransactionManager` — the `AsyncLocalStorage` engine + the `REQUIRED` / `REQUIRES_NEW` / `NESTED` propagation switch, plus rollback-via-`err`. `withTransaction(work)` is the callback/ALS path; `begin()` returns an `await using` scope (`TransactionScope`, rollback-unless-`commit()`).
 - `DrizzleAdapter` — the async `node-postgres` adapter (`wrapWithTransaction` / `wrapWithNestedTransaction` / `getBaseClient`), with Pool-backed detection and pool-timeout → `PoolConnectionTimeout` mapping.
 - `createTransactionalClient(resolve)` — a transparent `Proxy` that resolves each access to the currently-active transaction (or the base client), binding methods to the real instance so private-field access works.
-- `Result<T, E>` + `ok` / `err` / `isOk` / `isErr` / `assertNever` — the thin, dependency-free Result type.
-- `DrizzleTxError` — the exhaustive infrastructure-error union (`PoolConnectionTimeout`, `TransactionAborted`, `HostNotInitialized`, `NotPoolBacked`).
-- `Propagation`, `TxOptions`, `TxLogger`, and the `TransactionAdapter<TClient>` seam.
+- `Result<T, E>` (`Ok<T>` / `Err<E>`) + `ok` / `err` / `isOk` / `isErr` / `assertNever` — the thin, dependency-free Result type.
+- Result combinators — `map`, `mapErr`, `andThen`, `unwrapOr`, `match` (standalone, tree-shakable functions; consumers depend only on the `Result` *type*).
+- `DrizzleTxError` — the exhaustive infrastructure-error union (`PoolConnectionTimeout`, `TransactionAborted`, `HostNotInitialized`, `NotPoolBacked`), plus `DrizzleTxErrorKind` and the exhaustive `matchError(e, handlers)`.
+- `Propagation`, `TxOptions` (`IsolationLevel` / `AccessMode`), `TxLogger`, and the `TransactionAdapter<TClient>` seam.
 
 ## Usage
 
@@ -53,6 +54,16 @@ await manager.withTransaction(Propagation.RequiresNew, async () => {
   await db.insert(auditLog).values({ event: 'signup' });
   return ok(null);
 });
+```
+
+Or scope-based via explicit resource management (rolls back unless `commit()` — note a scope uses `scope.tx` explicitly and does **not** set the ALS context):
+
+```ts
+const opened = await manager.begin();
+if (!opened.ok) return opened;                          // infra error as a value
+await using scope = opened.value;
+await scope.tx.insert(users).values({ name: 'Ada' });
+scope.commit();                                          // omit → rollback on scope exit
 ```
 
 ## Building a new adapter
