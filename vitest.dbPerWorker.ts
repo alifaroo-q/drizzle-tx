@@ -3,6 +3,18 @@ import { Pool } from 'pg';
 import { inject } from 'vitest';
 import { relations } from './test/schema.js';
 
+// The `ProvidedContext` augmentation must live here too, not only in the paired
+// global setup: this file uses `inject('adminUri')` but doesn't import globalSetup,
+// so when a tool typechecks it in isolation (e.g. the editor's per-file program),
+// the augmentation from globalSetup isn't loaded and `keyof ProvidedContext` would be
+// `never`. Identical `export interface` declarations merge, so declaring it in both
+// files is safe. See `vitest.globalSetup.ts` for the `export interface` rationale.
+declare module 'vitest' {
+  export interface ProvidedContext {
+    adminUri: string;
+  }
+}
+
 export interface TestDb {
   db: NodePgDatabase<typeof relations>;
   pool: Pool;
@@ -21,12 +33,19 @@ const DDL = `
   );
 `;
 
+// Monotonic per-process counter. `VITEST_POOL_ID` is a reused worker-SLOT id, and
+// `createTestDb` can be called more than once per worker (even concurrently via
+// `Promise.all`). `Date.now()` alone is captured synchronously, so two calls in the
+// same millisecond would collide on `CREATE DATABASE`; the counter makes the name
+// unique within the worker regardless of timing.
+let seq = 0;
+
 /** Create an isolated database for this worker and return a migrated Drizzle instance.
  *  poolMax lets deadlock tests use a tiny pool. */
 export async function createTestDb(poolMax = 10): Promise<TestDb> {
   const adminUri = inject('adminUri');
   const workerId = process.env.VITEST_POOL_ID ?? '0';
-  const dbName = `test_w${workerId}_${Date.now().toString(36)}`;
+  const dbName = `test_w${workerId}_${Date.now().toString(36)}_${(seq++).toString(36)}`;
 
   const admin = new Pool({ connectionString: adminUri, max: 1 });
   await admin.query(`CREATE DATABASE ${dbName}`);
