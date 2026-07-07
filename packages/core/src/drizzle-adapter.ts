@@ -2,6 +2,17 @@ import { Pool } from 'pg';
 import type { TransactionAdapter } from './adapter.js';
 import type { TxOptions } from './options.js';
 
+/** Marker thrown when a pg pool connection acquisition times out (ADR-0002 fail-fast).
+ *  The manager maps it to `DrizzleTxError.PoolConnectionTimeout` by constructor name,
+ *  avoiding a core→pg import cycle. */
+export class PoolTimeoutError {
+  // Explicit field (not a parameter property) to satisfy `erasableSyntaxOnly`.
+  readonly timeoutMs: number | undefined;
+  constructor(timeoutMs: number | undefined) {
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 /** Minimal structural type for a Drizzle client that can open transactions.
  *  Avoids a hard dependency on drizzle-orm's concrete types. */
 export interface DrizzleTxCapable {
@@ -33,10 +44,17 @@ export class DrizzleAdapter<TClient extends DrizzleTxCapable>
     setClient: (client: TClient) => void,
     work: () => Promise<T>,
   ): Promise<T> {
-    return this.#db.transaction(async (tx) => {
-      setClient(tx);
-      return work();
-    }, options);
+    return this.#db
+      .transaction(async (tx) => {
+        setClient(tx);
+        return work();
+      }, options)
+      .catch((e: unknown) => {
+        if (e instanceof Error && /timeout exceeded when trying to connect/i.test(e.message)) {
+          throw new PoolTimeoutError(undefined);
+        }
+        throw e;
+      });
   }
 
   wrapWithNestedTransaction<T>(

@@ -1,6 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TransactionAdapter } from './adapter.js';
-import { type DrizzleTxError, notPoolBacked, transactionAborted } from './errors.js';
+import {
+  type DrizzleTxError,
+  notPoolBacked,
+  poolConnectionTimeout,
+  transactionAborted,
+} from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
 import { Propagation } from './propagation.js';
@@ -168,6 +173,15 @@ export class TransactionManager<TClient> {
 
   #fromThrow<T, E>(e: unknown): Result<T, E | DrizzleTxError> {
     if (e instanceof RollbackSignal) return err(e.payload as E);
+    // Constructor-name check avoids a core→adapter (→pg) import cycle: core must not import pg.
+    if (
+      e &&
+      typeof e === 'object' &&
+      'constructor' in e &&
+      (e as { constructor: { name?: string } }).constructor?.name === 'PoolTimeoutError'
+    ) {
+      return err(poolConnectionTimeout((e as { timeoutMs?: number }).timeoutMs));
+    }
     return err(transactionAborted(e));
   }
 

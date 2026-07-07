@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
-import { version } from './index.js';
+import { ok, Propagation } from './index.js';
 
-it('core package is importable', () => {
-  expect(version).toBe('0.0.0');
+it('core package is importable via its public entrypoint', () => {
+  expect(typeof ok).toBe('function');
+  expect(Propagation.Required).toBe('REQUIRED');
 });
