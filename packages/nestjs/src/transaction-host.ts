@@ -3,6 +3,7 @@ import type {
   Propagation,
   Result,
   TransactionManager,
+  TransactionScope,
   TransactionWork,
   TxOptions,
 } from '@drizzle-tx/core';
@@ -31,6 +32,14 @@ export class TransactionHost {
 
   isTransactionActive(): boolean {
     return this.#manager.isTransactionActive();
+  }
+
+  /** Open a transaction as an `await using` scope (explicit resource management).
+   *  Rolls back on dispose unless `commit()` is called; returns `err(...)` (never throws)
+   *  if the transaction cannot start. NOTE: a scope does not set the ALS context, so the
+   *  injected `DRIZZLE_TX_CLIENT` proxy will not auto-join it — use `scope.tx` explicitly. */
+  begin(options?: TxOptions): Promise<Result<TransactionScope<unknown>, DrizzleTxError>> {
+    return this.#manager.begin(options);
   }
 
   // Overloads mirror TransactionManager.withTransaction so callers keep full type safety.

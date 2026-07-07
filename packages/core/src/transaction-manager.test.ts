@@ -11,10 +11,14 @@ function makeFakeAdapter(opts?: { supportsIndependent?: boolean }): {
   adapter: TransactionAdapter<FakeClient>;
   begins: string[];
   savepoints: string[];
+  commits: string[];
+  rollbacks: string[];
 } {
   const base: FakeClient = { tag: 'base' };
   const begins: string[] = [];
   const savepoints: string[] = [];
+  const commits: string[] = [];
+  const rollbacks: string[] = [];
   let counter = 0;
   const adapter: TransactionAdapter<FakeClient> = {
     getBaseClient: () => base,
@@ -23,7 +27,15 @@ function makeFakeAdapter(opts?: { supportsIndependent?: boolean }): {
       const tx: FakeClient = { tag: `tx${++counter}` };
       begins.push(tx.tag);
       setClient(tx);
-      return work(); // throwing here == rollback (drizzle semantics)
+      // A resolved callback commits; a throw rolls back (drizzle semantics).
+      try {
+        const result = await work();
+        commits.push(tx.tag);
+        return result;
+      } catch (e) {
+        rollbacks.push(tx.tag);
+        throw e;
+      }
     },
     wrapWithNestedTransaction: async (_parent, setClient, work) => {
       const sp: FakeClient = { tag: `sp${++counter}` };
@@ -32,7 +44,7 @@ function makeFakeAdapter(opts?: { supportsIndependent?: boolean }): {
       return work();
     },
   };
-  return { adapter, begins, savepoints };
+  return { adapter, begins, savepoints, commits, rollbacks };
 }
 
 describe('TransactionManager', () => {
@@ -140,5 +152,67 @@ describe('TransactionManager', () => {
       return ok(null);
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignored'));
+  });
+});
+
+describe('TransactionManager.begin (scope-based / AsyncDisposable)', () => {
+  it('begin() opens a transaction and exposes the tx client', async () => {
+    const { adapter, begins } = makeFakeAdapter();
+    const m = new TransactionManager(adapter);
+    const opened = await m.begin();
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value.tx.tag).toBe('tx1');
+    expect(begins).toEqual(['tx1']);
+    opened.value.commit();
+    await opened.value[Symbol.asyncDispose]();
+  });
+
+  it('commit() then dispose COMMITS', async () => {
+    const { adapter, commits, rollbacks } = makeFakeAdapter();
+    const m = new TransactionManager(adapter);
+    const opened = await m.begin();
+    if (!opened.ok) throw new Error('expected ok');
+    opened.value.commit();
+    await opened.value[Symbol.asyncDispose]();
+    expect(commits).toEqual(['tx1']);
+    expect(rollbacks).toEqual([]);
+  });
+
+  it('dispose WITHOUT commit rolls back (default-deny)', async () => {
+    const { adapter, commits, rollbacks } = makeFakeAdapter();
+    const m = new TransactionManager(adapter);
+    const opened = await m.begin();
+    if (!opened.ok) throw new Error('expected ok');
+    // no commit() call
+    await opened.value[Symbol.asyncDispose]();
+    expect(commits).toEqual([]);
+    expect(rollbacks).toEqual(['tx1']);
+  });
+
+  it('explicit rollback() after commit() wins (last decision before dispose)', async () => {
+    const { adapter, commits, rollbacks } = makeFakeAdapter();
+    const m = new TransactionManager(adapter);
+    const opened = await m.begin();
+    if (!opened.ok) throw new Error('expected ok');
+    opened.value.commit();
+    opened.value.rollback();
+    await opened.value[Symbol.asyncDispose]();
+    expect(commits).toEqual([]);
+    expect(rollbacks).toEqual(['tx1']);
+  });
+
+  it('returns err(NotPoolBacked) as a value when the transaction cannot start', async () => {
+    // Adapter whose wrapWithTransaction rejects before running the work callback.
+    const failing: TransactionAdapter<FakeClient> = {
+      getBaseClient: () => ({ tag: 'base' }),
+      supportsIndependentTransactions: false,
+      wrapWithTransaction: () => Promise.reject(new Error('cannot start')),
+      wrapWithNestedTransaction: (_p, _s, work) => work(),
+    };
+    const m = new TransactionManager(failing);
+    const opened = await m.begin();
+    expect(opened.ok).toBe(false);
+    if (!opened.ok) expect(opened.error.kind).toBe('TransactionAborted');
   });
 });

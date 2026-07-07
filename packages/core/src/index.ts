@@ -12,6 +12,7 @@ export * from './result.js';
 export {
   TransactionManager,
   type TransactionManagerOptions,
+  type TransactionScope,
   type TransactionWork,
 } from './transaction-manager.js';
 export { createTransactionalClient } from './transactional-client.js';
