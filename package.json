@@ -20,7 +20,12 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
     "@changesets/cli": "^2.31.0",
+    "@testcontainers/postgresql": "catalog:",
     "@types/node": "^24.0.0",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@vitest/coverage-v8": "catalog:"

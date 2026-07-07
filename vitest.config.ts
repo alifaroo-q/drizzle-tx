@@ -23,7 +23,19 @@ export default defineConfig({
       // (not globbing nestjs files into a plain project) is REQUIRED — otherwise
       // decorator DI silently breaks under the root runner.
       'packages/nestjs',
-      // The core-integration project is added in Task 2 (needs the container harness).
+      {
+        test: {
+          name: 'core-integration',
+          globals: true,
+          environment: 'node',
+          include: ['packages/core/src/**/*.integration.test.ts'],
+          globalSetup: ['./vitest.globalSetup.ts'],
+          pool: 'forks',
+          restoreMocks: true,
+          testTimeout: 30000,
+          hookTimeout: 60000,
+        },
+      },
     ],
   },
 });
