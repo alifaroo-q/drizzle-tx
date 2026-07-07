@@ -24,6 +24,23 @@ export interface DrizzleAdapterConfig<TClient extends DrizzleTxCapable> {
   readonly db: TClient;
 }
 
+/** True when `$client` is a pg `Pool` (required for REQUIRES_NEW — ADR-0002).
+ *  `instanceof Pool` is the primary check, but it is identity-sensitive: a duplicated
+ *  `pg` module instance (ESM/CJS interop, or a monorepo test harness loading the built
+ *  package alongside source) yields a different `Pool` class and a false negative. The
+ *  structural fallback recognises a pg Pool by its pool-only counters (`totalCount` /
+ *  `idleCount`), which a single `pg.Client` does not expose. */
+function isPoolBacked(client: unknown): boolean {
+  if (client instanceof Pool) return true;
+  return (
+    typeof client === 'object' &&
+    client !== null &&
+    'totalCount' in client &&
+    'idleCount' in client &&
+    typeof (client as { connect?: unknown }).connect === 'function'
+  );
+}
+
 export class DrizzleAdapter<TClient extends DrizzleTxCapable>
   implements TransactionAdapter<TClient>
 {
@@ -32,7 +49,7 @@ export class DrizzleAdapter<TClient extends DrizzleTxCapable>
 
   constructor(config: DrizzleAdapterConfig<TClient>) {
     this.#db = config.db;
-    this.supportsIndependentTransactions = config.db.$client instanceof Pool;
+    this.supportsIndependentTransactions = isPoolBacked(config.db.$client);
   }
 
   getBaseClient(): TClient {
