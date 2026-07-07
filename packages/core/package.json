@@ -1,0 +1,53 @@
+{
+  "name": "@drizzle-tx/core",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:publish": "pnpm build && publint --strict && attw --pack ."
+  },
+  "peerDependencies": {
+    "drizzle-orm": "^1.0.0-rc.4"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
+    "@types/pg": "catalog:",
+    "tsdown": "0.22.3",
+    "publint": "^0.3.21",
+    "@arethetypeswrong/cli": "^0.18.4",
+    "typescript": "catalog:"
+  }
+}
