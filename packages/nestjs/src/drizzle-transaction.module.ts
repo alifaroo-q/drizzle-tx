@@ -29,6 +29,7 @@ export interface DrizzleTransactionModuleAsyncOptions {
 
 @Global()
 @Module({})
+// biome-ignore lint/complexity/noStaticOnlyClass: this class is a NestJS module, which is expected to have only static methods
 export class DrizzleTransactionModule {
   static forRoot(options: DrizzleTransactionModuleOptions): DynamicModule {
     return DrizzleTransactionModule.build(
