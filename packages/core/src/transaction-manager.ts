@@ -26,7 +26,25 @@ class RollbackSignal<E> {
   }
 }
 
-type Work<T, E> = () => Promise<Result<T, E>>;
+/** A unit of transactional work: an async function returning an explicit `Result`.
+ *  Returning `err(...)` triggers a rollback (ADR-0003). */
+export type TransactionWork<T, E> = () => Promise<Result<T, E>>;
+
+/** Structural shape of the adapter's `PoolTimeoutError`. */
+interface PoolTimeoutLike {
+  readonly timeoutMs: number | undefined;
+}
+
+/** Recognise the adapter's `PoolTimeoutError` by constructor name rather than by
+ *  `instanceof`. Core must not import the pg-backed adapter (it would pull `pg` into
+ *  the framework-agnostic engine's module graph), so the match stays structural. */
+function isPoolTimeoutError(e: unknown): e is PoolTimeoutLike {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { constructor?: { name?: string } }).constructor?.name === 'PoolTimeoutError'
+  );
+}
 
 export interface TransactionManagerOptions {
   readonly logger?: TxLogger;
@@ -51,28 +69,28 @@ export class TransactionManager<TClient> {
   }
 
   // Overloads mirror the imperative API.
-  withTransaction<T, E>(work: Work<T, E>): Promise<Result<T, E | DrizzleTxError>>;
+  withTransaction<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
     propagation: Propagation,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
     options: TxOptions,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
     propagation: Propagation,
     options: TxOptions,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
-    a: Propagation | TxOptions | Work<T, E>,
-    b?: TxOptions | Work<T, E>,
-    c?: Work<T, E>,
+    a: Propagation | TxOptions | TransactionWork<T, E>,
+    b?: TxOptions | TransactionWork<T, E>,
+    c?: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     let propagation: Propagation = Propagation.Required;
     let options: TxOptions | undefined;
-    let work: Work<T, E>;
+    let work: TransactionWork<T, E>;
     if (typeof a === 'function') {
       work = a;
     } else if (typeof a === 'string') {
@@ -80,11 +98,11 @@ export class TransactionManager<TClient> {
       if (typeof b === 'function') work = b;
       else {
         options = b as TxOptions;
-        work = c as Work<T, E>;
+        work = c as TransactionWork<T, E>;
       }
     } else {
       options = a;
-      work = b as Work<T, E>;
+      work = b as TransactionWork<T, E>;
     }
     return this.#run(propagation, options, work);
   }
@@ -92,7 +110,7 @@ export class TransactionManager<TClient> {
   #run<T, E>(
     propagation: Propagation,
     options: TxOptions | undefined,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     const active = this.isTransactionActive();
     switch (propagation) {
@@ -114,7 +132,7 @@ export class TransactionManager<TClient> {
   /** Join: run work in the current context; no new BEGIN. Options are ignored (warn). */
   async #join<T, E>(
     options: TxOptions | undefined,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     this.#warnIfOptions(options, 'joining an existing transaction');
     return work();
@@ -122,7 +140,7 @@ export class TransactionManager<TClient> {
 
   async #newTransaction<T, E>(
     options: TxOptions | undefined,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     const ctx: TxContext<TClient> = { client: this.#adapter.getBaseClient(), active: true };
     try {
@@ -143,7 +161,7 @@ export class TransactionManager<TClient> {
 
   async #nested<T, E>(
     options: TxOptions | undefined,
-    work: Work<T, E>,
+    work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     this.#warnIfOptions(options, 'a NESTED (savepoint) transaction');
     const parent = this.getTransactionClient();
@@ -165,7 +183,7 @@ export class TransactionManager<TClient> {
   }
 
   /** Run work; convert an `err` result into the rollback-triggering throw. */
-  async #execute<T, E>(work: Work<T, E>): Promise<T> {
+  async #execute<T, E>(work: TransactionWork<T, E>): Promise<T> {
     const result = await work();
     if (!result.ok) throw new RollbackSignal(result.error);
     return result.value;
@@ -173,15 +191,7 @@ export class TransactionManager<TClient> {
 
   #fromThrow<T, E>(e: unknown): Result<T, E | DrizzleTxError> {
     if (e instanceof RollbackSignal) return err(e.payload as E);
-    // Constructor-name check avoids a core→adapter (→pg) import cycle: core must not import pg.
-    if (
-      e &&
-      typeof e === 'object' &&
-      'constructor' in e &&
-      (e as { constructor: { name?: string } }).constructor?.name === 'PoolTimeoutError'
-    ) {
-      return err(poolConnectionTimeout((e as { timeoutMs?: number }).timeoutMs));
-    }
+    if (isPoolTimeoutError(e)) return err(poolConnectionTimeout(e.timeoutMs));
     return err(transactionAborted(e));
   }
 
