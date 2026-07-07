@@ -16,8 +16,11 @@ export default defineConfig({
     name: 'nestjs',
     globals: true,
     environment: 'node',
+    include: ['src/**/*.integration.test.ts'],
+    globalSetup: ['../../vitest.globalSetup.ts'],
+    pool: 'forks',
+    testTimeout: 30000,
+    hookTimeout: 60000,
     restoreMocks: true,
-    // No `include` yet → Vitest's default picks up di-smoke.integration.test.ts.
-    // Task 8 adds the container globalSetup + forks pool for DB integration tests.
   },
 });
