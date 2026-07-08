@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TransactionAdapter } from './adapter.js';
 import { type DrizzleTxError, transactionAborted } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
@@ -7,11 +6,7 @@ import type { Propagation } from './propagation.js';
 import { normalizeArgs, planTransaction } from './propagation-plan.js';
 import { err, ok, type Result } from './result.js';
 import { classifyRollback, toThrowable } from './rollback-boundary.js';
-
-interface TxContext<TClient> {
-  client: TClient;
-  active: boolean;
-}
+import { TransactionContext } from './transaction-context.js';
 
 /** A unit of transactional work: an async function returning an explicit `Result`.
  *  Returning `err(...)` triggers a rollback (ADR-0003). */
@@ -41,7 +36,7 @@ export interface TransactionScope<TClient> extends AsyncDisposable {
 }
 
 export class TransactionManager<TClient> {
-  readonly #als = new AsyncLocalStorage<TxContext<TClient>>();
+  readonly #ctx = new TransactionContext<TClient>();
   readonly #adapter: TransactionAdapter<TClient>;
   readonly #logger: TxLogger;
 
@@ -51,11 +46,11 @@ export class TransactionManager<TClient> {
   }
 
   getTransactionClient(): TClient {
-    return this.#als.getStore()?.client ?? this.#adapter.getBaseClient();
+    return this.#ctx.current() ?? this.#adapter.getBaseClient();
   }
 
   isTransactionActive(): boolean {
-    return this.#als.getStore()?.active ?? false;
+    return this.#ctx.isActive();
   }
 
   // Overloads mirror the imperative API.
@@ -179,16 +174,9 @@ export class TransactionManager<TClient> {
     options: TxOptions | undefined,
     work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
-    const ctx: TxContext<TClient> = { client: this.#adapter.getBaseClient(), active: true };
     try {
-      const value = await this.#als.run(ctx, () =>
-        this.#adapter.wrapWithTransaction(
-          options,
-          (client) => {
-            ctx.client = client;
-          },
-          async () => toThrowable(await work()),
-        ),
+      const value = await this.#adapter.wrapWithTransaction(options, (tx) =>
+        this.#ctx.run(tx, async () => toThrowable(await work())),
       );
       return ok(value);
     } catch (e) {
@@ -198,16 +186,9 @@ export class TransactionManager<TClient> {
 
   async #nested<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>> {
     const parent = this.getTransactionClient();
-    const ctx: TxContext<TClient> = { client: parent, active: true };
     try {
-      const value = await this.#als.run(ctx, () =>
-        this.#adapter.wrapWithNestedTransaction(
-          parent,
-          (client) => {
-            ctx.client = client;
-          },
-          async () => toThrowable(await work()),
-        ),
+      const value = await this.#adapter.wrapWithNestedTransaction(parent, (sp) =>
+        this.#ctx.run(sp, async () => toThrowable(await work())),
       );
       return ok(value);
     } catch (e) {

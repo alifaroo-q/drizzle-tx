@@ -8,17 +8,12 @@ export interface TransactionAdapter<TClient> {
    *  (i.e. Pool-backed). REQUIRES_NEW while already active requires this. */
   readonly supportsIndependentTransactions: boolean;
 
-  /** Start a new top-level transaction from the base client; call setClient with the tx client. */
+  /** Start a new top-level transaction from the base client; the tx client is passed to `work`. */
   wrapWithTransaction<T>(
     options: TxOptions | undefined,
-    setClient: (client: TClient) => void,
-    work: () => Promise<T>,
+    work: (tx: TClient) => Promise<T>,
   ): Promise<T>;
 
-  /** Start a savepoint from the given parent transaction client. */
-  wrapWithNestedTransaction<T>(
-    parent: TClient,
-    setClient: (client: TClient) => void,
-    work: () => Promise<T>,
-  ): Promise<T>;
+  /** Start a savepoint from the given parent transaction client; the savepoint client is passed to `work`. */
+  wrapWithNestedTransaction<T>(parent: TClient, work: (sp: TClient) => Promise<T>): Promise<T>;
 }

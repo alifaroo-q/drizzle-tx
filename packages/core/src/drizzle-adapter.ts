@@ -58,14 +58,10 @@ export class DrizzleAdapter<TClient extends DrizzleTxCapable>
 
   wrapWithTransaction<T>(
     options: TxOptions | undefined,
-    setClient: (client: TClient) => void,
-    work: () => Promise<T>,
+    work: (tx: TClient) => Promise<T>,
   ): Promise<T> {
     return this.#db
-      .transaction(async (tx) => {
-        setClient(tx);
-        return work();
-      }, options)
+      .transaction(async (tx) => work(tx), options)
       .catch((e: unknown) => {
         if (e instanceof Error && /timeout exceeded when trying to connect/i.test(e.message)) {
           throw new PoolTimeoutError(undefined);
@@ -74,15 +70,8 @@ export class DrizzleAdapter<TClient extends DrizzleTxCapable>
       });
   }
 
-  wrapWithNestedTransaction<T>(
-    parent: TClient,
-    setClient: (client: TClient) => void,
-    work: () => Promise<T>,
-  ): Promise<T> {
+  wrapWithNestedTransaction<T>(parent: TClient, work: (sp: TClient) => Promise<T>): Promise<T> {
     // Nested == SAVEPOINT; no options (isolation is fixed at the outer tx).
-    return parent.transaction(async (sp) => {
-      setClient(sp);
-      return work();
-    });
+    return parent.transaction(async (sp) => work(sp));
   }
 }

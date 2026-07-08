@@ -23,13 +23,12 @@ function makeFakeAdapter(opts?: { supportsIndependent?: boolean }): {
   const adapter: TransactionAdapter<FakeClient> = {
     getBaseClient: () => base,
     supportsIndependentTransactions: opts?.supportsIndependent ?? true,
-    wrapWithTransaction: async (_options, setClient, work) => {
+    wrapWithTransaction: async (_options, work) => {
       const tx: FakeClient = { tag: `tx${++counter}` };
       begins.push(tx.tag);
-      setClient(tx);
       // A resolved callback commits; a throw rolls back (drizzle semantics).
       try {
-        const result = await work();
+        const result = await work(tx);
         commits.push(tx.tag);
         return result;
       } catch (e) {
@@ -37,11 +36,10 @@ function makeFakeAdapter(opts?: { supportsIndependent?: boolean }): {
         throw e;
       }
     },
-    wrapWithNestedTransaction: async (_parent, setClient, work) => {
+    wrapWithNestedTransaction: async (_parent, work) => {
       const sp: FakeClient = { tag: `sp${++counter}` };
       savepoints.push(sp.tag);
-      setClient(sp);
-      return work();
+      return work(sp);
     },
   };
   return { adapter, begins, savepoints, commits, rollbacks };
@@ -208,7 +206,7 @@ describe('TransactionManager.begin (scope-based / AsyncDisposable)', () => {
       getBaseClient: () => ({ tag: 'base' }),
       supportsIndependentTransactions: false,
       wrapWithTransaction: () => Promise.reject(new Error('cannot start')),
-      wrapWithNestedTransaction: (_p, _s, work) => work(),
+      wrapWithNestedTransaction: (_p, work) => work({ tag: 'base' }),
     };
     const m = new TransactionManager(failing);
     const opened = await m.begin();
