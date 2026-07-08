@@ -3,8 +3,8 @@ import type { TransactionAdapter } from './adapter.js';
 import { type DrizzleTxError, poolConnectionTimeout, transactionAborted } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
-import { Propagation } from './propagation.js';
-import { planTransaction } from './propagation-plan.js';
+import type { Propagation } from './propagation.js';
+import { normalizeArgs, planTransaction } from './propagation-plan.js';
 import { err, ok, type Result } from './result.js';
 
 interface TxContext<TClient> {
@@ -103,22 +103,7 @@ export class TransactionManager<TClient> {
     b?: TxOptions | TransactionWork<T, E>,
     c?: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
-    let propagation: Propagation = Propagation.Required;
-    let options: TxOptions | undefined;
-    let work: TransactionWork<T, E>;
-    if (typeof a === 'function') {
-      work = a;
-    } else if (typeof a === 'string') {
-      propagation = a;
-      if (typeof b === 'function') work = b;
-      else {
-        options = b as TxOptions;
-        work = c as TransactionWork<T, E>;
-      }
-    } else {
-      options = a;
-      work = b as TransactionWork<T, E>;
-    }
+    const { propagation, options, work } = normalizeArgs(a, b, c);
     return this.#run(propagation, options, work);
   }
 

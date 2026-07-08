@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Propagation } from './propagation.js';
-import { planTransaction } from './propagation-plan.js';
+import { normalizeArgs, planTransaction } from './propagation-plan.js';
+import { ok } from './result.js';
 
 describe('planTransaction', () => {
   it('REQUIRED + inactive → new-root carrying options', () => {
@@ -86,5 +87,31 @@ describe('planTransaction', () => {
         supportsIndependentTransactions: true,
       }),
     ).toEqual({ kind: 'new-root', options: undefined });
+  });
+});
+
+describe('normalizeArgs', () => {
+  const work = async () => ok(1);
+
+  it('(work) → REQUIRED, no options', () => {
+    expect(normalizeArgs(work)).toEqual({ propagation: 'REQUIRED', work });
+  });
+
+  it('(propagation, work)', () => {
+    expect(normalizeArgs('NESTED', work)).toEqual({ propagation: 'NESTED', work });
+  });
+
+  it('(propagation, options, work)', () => {
+    const options = { isolationLevel: 'serializable' } as const;
+    expect(normalizeArgs('REQUIRES_NEW', options, work)).toEqual({
+      propagation: 'REQUIRES_NEW',
+      options,
+      work,
+    });
+  });
+
+  it('(options, work) → REQUIRED with options', () => {
+    const options = { accessMode: 'read only' } as const;
+    expect(normalizeArgs(options, work)).toEqual({ propagation: 'REQUIRED', options, work });
   });
 });
