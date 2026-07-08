@@ -1,46 +1,21 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TransactionAdapter } from './adapter.js';
-import { type DrizzleTxError, poolConnectionTimeout, transactionAborted } from './errors.js';
+import { type DrizzleTxError, transactionAborted } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
 import type { Propagation } from './propagation.js';
 import { normalizeArgs, planTransaction } from './propagation-plan.js';
 import { err, ok, type Result } from './result.js';
+import { classifyRollback, toThrowable } from './rollback-boundary.js';
 
 interface TxContext<TClient> {
   client: TClient;
   active: boolean;
 }
 
-/** Internal throw used ONLY to trigger a rollback; caught at the same boundary. */
-class RollbackSignal<E> {
-  // Explicit field + assignment (not a constructor parameter property) to satisfy
-  // `erasableSyntaxOnly` — parameter properties emit non-erasable runtime code.
-  readonly payload: E;
-  constructor(payload: E) {
-    this.payload = payload;
-  }
-}
-
 /** A unit of transactional work: an async function returning an explicit `Result`.
  *  Returning `err(...)` triggers a rollback (ADR-0003). */
 export type TransactionWork<T, E> = () => Promise<Result<T, E>>;
-
-/** Structural shape of the adapter's `PoolTimeoutError`. */
-interface PoolTimeoutLike {
-  readonly timeoutMs: number | undefined;
-}
-
-/** Recognise the adapter's `PoolTimeoutError` by constructor name rather than by
- *  `instanceof`. Core must not import the pg-backed adapter (it would pull `pg` into
- *  the framework-agnostic engine's module graph), so the match stays structural. */
-function isPoolTimeoutError(e: unknown): e is PoolTimeoutLike {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    (e as { constructor?: { name?: string } }).constructor?.name === 'PoolTimeoutError'
-  );
-}
 
 /** Internal sentinel: a scope disposed without `commit()` returns this `err` to roll back. */
 const SCOPE_ROLLBACK: unique symbol = Symbol('drizzle-tx:scope-rollback');
@@ -212,12 +187,12 @@ export class TransactionManager<TClient> {
           (client) => {
             ctx.client = client;
           },
-          async () => this.#execute(work),
+          async () => toThrowable(await work()),
         ),
       );
       return ok(value);
     } catch (e) {
-      return this.#fromThrow<T, E>(e);
+      return classifyRollback<E>(e);
     }
   }
 
@@ -231,26 +206,13 @@ export class TransactionManager<TClient> {
           (client) => {
             ctx.client = client;
           },
-          async () => this.#execute(work),
+          async () => toThrowable(await work()),
         ),
       );
       return ok(value);
     } catch (e) {
-      return this.#fromThrow<T, E>(e);
+      return classifyRollback<E>(e);
     }
-  }
-
-  /** Run work; convert an `err` result into the rollback-triggering throw. */
-  async #execute<T, E>(work: TransactionWork<T, E>): Promise<T> {
-    const result = await work();
-    if (!result.ok) throw new RollbackSignal(result.error);
-    return result.value;
-  }
-
-  #fromThrow<T, E>(e: unknown): Result<T, E | DrizzleTxError> {
-    if (e instanceof RollbackSignal) return err(e.payload as E);
-    if (isPoolTimeoutError(e)) return err(poolConnectionTimeout(e.timeoutMs));
-    return err(transactionAborted(e));
   }
 
   #warnIgnoredOptions(context: string): void {
