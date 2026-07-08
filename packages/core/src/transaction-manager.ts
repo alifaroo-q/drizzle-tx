@@ -1,14 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TransactionAdapter } from './adapter.js';
-import {
-  type DrizzleTxError,
-  notPoolBacked,
-  poolConnectionTimeout,
-  transactionAborted,
-} from './errors.js';
+import { type DrizzleTxError, poolConnectionTimeout, transactionAborted } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
 import { Propagation } from './propagation.js';
+import { planTransaction } from './propagation-plan.js';
 import { err, ok, type Result } from './result.js';
 
 interface TxContext<TClient> {
@@ -197,30 +193,26 @@ export class TransactionManager<TClient> {
     options: TxOptions | undefined,
     work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
-    const active = this.isTransactionActive();
-    switch (propagation) {
-      case Propagation.Required:
-        return active ? this.#join(options, work) : this.#newTransaction(options, work);
-      case Propagation.RequiresNew:
-        if (active && !this.#adapter.supportsIndependentTransactions) {
-          return Promise.resolve(err(notPoolBacked()));
-        }
-        return this.#newTransaction(options, work);
-      case Propagation.Nested:
-        return active ? this.#nested(options, work) : this.#newTransaction(options, work);
-      default:
-        // v1 supports only the three modes above; the type prevents others.
-        return this.#newTransaction(options, work);
+    const plan = planTransaction({
+      propagation,
+      active: this.isTransactionActive(),
+      supportsIndependentTransactions: this.#adapter.supportsIndependentTransactions,
+      options,
+    });
+    switch (plan.kind) {
+      case 'join':
+        if (plan.ignoredOptions) this.#warnIgnoredOptions('joining an existing transaction');
+        return work();
+      case 'new-root':
+        return this.#newTransaction(plan.options, work);
+      case 'nested':
+        if (plan.ignoredOptions) this.#warnIgnoredOptions('a NESTED (savepoint) transaction');
+        // The 'nested' variant has no `options` field (savepoint isolation is fixed at the
+        // outer tx), and `#nested` ignores options entirely.
+        return this.#nested(work);
+      case 'reject':
+        return Promise.resolve(err(plan.error));
     }
-  }
-
-  /** Join: run work in the current context; no new BEGIN. Options are ignored (warn). */
-  async #join<T, E>(
-    options: TxOptions | undefined,
-    work: TransactionWork<T, E>,
-  ): Promise<Result<T, E | DrizzleTxError>> {
-    this.#warnIfOptions(options, 'joining an existing transaction');
-    return work();
   }
 
   async #newTransaction<T, E>(
@@ -244,11 +236,7 @@ export class TransactionManager<TClient> {
     }
   }
 
-  async #nested<T, E>(
-    options: TxOptions | undefined,
-    work: TransactionWork<T, E>,
-  ): Promise<Result<T, E | DrizzleTxError>> {
-    this.#warnIfOptions(options, 'a NESTED (savepoint) transaction');
+  async #nested<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>> {
     const parent = this.getTransactionClient();
     const ctx: TxContext<TClient> = { client: parent, active: true };
     try {
@@ -280,11 +268,9 @@ export class TransactionManager<TClient> {
     return err(transactionAborted(e));
   }
 
-  #warnIfOptions(options: TxOptions | undefined, context: string): void {
-    if (options && Object.keys(options).length > 0) {
-      this.#logger.warn(
-        `Transaction options are ignored for ${context}; isolation/access-mode apply only to a new top-level transaction.`,
-      );
-    }
+  #warnIgnoredOptions(context: string): void {
+    this.#logger.warn(
+      `Transaction options are ignored for ${context}; isolation/access-mode apply only to a new top-level transaction.`,
+    );
   }
 }
