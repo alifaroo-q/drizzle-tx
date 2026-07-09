@@ -28,7 +28,7 @@ _Avoid_: using "connection" to mean the client or the transaction
 The framework-agnostic core engine (`@drizzle-tx/core`) — owns the `AsyncLocalStorage`, the propagation switch, and rollback handling.
 
 **Adapter**:
-The ORM seam the manager talks to (`wrapWithTransaction` / `wrapWithNestedTransaction` / `getBaseClient`). The v1 implementation is the Postgres `DrizzleAdapter` (async-only).
+The ORM seam the manager talks to (`wrapWithTransaction` / `wrapWithNestedTransaction` / `getBaseClient`). The v1 production implementation is the Postgres `DrizzleAdapter` (async-only); a second `NoOpDrizzleAdapter` (from `@drizzle-tx/core/testing`) runs work against a caller-supplied client with no real transaction, and records the boundaries it enters, for tests (ADR-0007).
 
 **Transaction host**:
 The NestJS-facing facade — the imperative `withTransaction()` API plus DI wiring; registers itself in a static registry so `@Transactional` can find it at call time.
