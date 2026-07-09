@@ -22,8 +22,12 @@ export class TransactionHost {
     registry.set(DEFAULT_KEY, this);
   }
 
-  static get(connectionName?: string): TransactionHost | undefined {
-    return registry.get(connectionName ?? DEFAULT_KEY);
+  // v1 wires a single default slot. The registry stays a Map (not a bare ref) so keying
+  // it by an actual connection name is an additive change — see docs/BACKLOG.md item H —
+  // but `get()` deliberately takes NO connectionName: exposing one would advertise a
+  // lookup that always misses in v1 and returns `err(HostNotInitialized)`.
+  static get(): TransactionHost | undefined {
+    return registry.get(DEFAULT_KEY);
   }
 
   get tx(): unknown {
