@@ -27,3 +27,5 @@ pnpm-debug.log*
 
 # Turbo/other caches
 .turbo/
+
+.claude/
