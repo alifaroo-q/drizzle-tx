@@ -53,3 +53,17 @@ Integration tests require a running Docker daemon (Testcontainers pulls `postgre
 - The manager uses `AsyncLocalStorage.run()` (never `enterWith()`) to avoid context leakage.
 - `REQUIRES_NEW` draws a *fresh* pooled connection while the parent holds its own → pool `max` must exceed the deepest concurrent nesting depth or it deadlocks. A finite `connectionTimeoutMillis` makes exhaustion fail fast as `err(PoolConnectionTimeout)` (ADR-0002).
 - `@Transactional` resolves `TransactionHost` from a process-global registry (a method decorator has no DI access) → one app per process per connection name (ADR-0004). Vitest `forks` isolates each test file's process, so DB-per-worker parallelism is unaffected.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub issues on `alifaroo-q/drizzle-tx` via the `gh` CLI. Two accounts are logged in — run `gh auth switch --user alifaroo-q` before any `gh` operation here. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
