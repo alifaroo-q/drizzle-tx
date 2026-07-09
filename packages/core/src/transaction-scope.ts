@@ -1,0 +1,84 @@
+import { type DrizzleTxError, transactionAborted } from './errors.js';
+import type { TxLogger } from './logger.js';
+import { err, ok, type Result } from './result.js';
+
+/** Internal sentinel: a scope disposed without `commit()` returns this `err` to roll back. */
+const SCOPE_ROLLBACK: unique symbol = Symbol('drizzle-tx:scope-rollback');
+
+/** A block-scoped transaction handle for the `await using` API. Rolls back on dispose
+ *  UNLESS `commit()` is called (default-deny, ADR-0002/0003).
+ *
+ *  IMPORTANT: unlike `withTransaction`, a scope does NOT establish the AsyncLocalStorage
+ *  context (that requires a callback; `enterWith` is forbidden by ADR-0001). So the injected
+ *  transactional-client proxy will NOT auto-join a scope — use `scope.tx` explicitly for
+ *  queries, or use `withTransaction(work)` when you want implicit propagation. */
+export interface TransactionScope<TClient> extends AsyncDisposable {
+  /** The active transaction client — pass it explicitly to your queries. */
+  readonly tx: TClient;
+  /** Mark the transaction to COMMIT on dispose. */
+  commit(): void;
+  /** Mark the transaction to ROLL BACK on dispose (the default). */
+  rollback(): void;
+}
+
+/** Bridge a callback-scoped transaction runner to a block-scoped `await using` handle.
+ *  `runNewTransaction` starts a new top-level transaction and runs the passed work inside it;
+ *  `captureClient` returns the active tx client (called from inside that work). */
+export async function openScope<TClient>(
+  runNewTransaction: (
+    work: () => Promise<Result<void, symbol>>,
+  ) => Promise<Result<void, symbol | DrizzleTxError>>,
+  captureClient: () => TClient,
+  logger: TxLogger,
+): Promise<Result<TransactionScope<TClient>, DrizzleTxError>> {
+  let outcome: 'commit' | 'rollback' = 'rollback'; // default-deny
+  let releaseGate!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+  let capturedClient: TClient | undefined;
+  let markStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+
+  // Bridge the adapter's callback-scoped transaction to a block scope: the work callback
+  // captures the tx client, then parks on `gate` — keeping the transaction open — until
+  // dispose releases it and decides commit vs rollback.
+  const settled = runNewTransaction(async () => {
+    capturedClient = captureClient();
+    markStarted();
+    await gate;
+    return outcome === 'commit' ? ok(undefined) : err(SCOPE_ROLLBACK);
+  });
+
+  // Proceed once the tx has begun (client captured) OR it ended early (start failed).
+  await Promise.race([started, settled]);
+  if (capturedClient === undefined) {
+    const early = await settled;
+    return early.ok
+      ? err(transactionAborted(new Error('transaction closed before it started')))
+      : err(early.error as DrizzleTxError);
+  }
+
+  const scope: TransactionScope<TClient> = {
+    tx: capturedClient,
+    commit: () => {
+      outcome = 'commit';
+    },
+    rollback: () => {
+      outcome = 'rollback';
+    },
+    [Symbol.asyncDispose]: async () => {
+      releaseGate();
+      const result = await settled;
+      // Disposal never throws (no-throw model). A genuine commit/rollback failure (not the
+      // internal rollback sentinel) is surfaced via the logger; use withTransaction() when
+      // you need to handle that failure as a Result value.
+      if (!result.ok && result.error !== SCOPE_ROLLBACK) {
+        logger.warn(`transaction scope failed to settle: ${String(result.error)}`);
+      }
+    },
+  };
+  return ok(scope);
+}

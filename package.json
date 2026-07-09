@@ -1,0 +1,33 @@
+{
+  "name": "drizzle-tx-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "tsc -b tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project core-unit",
+    "test:int": "vitest run --project core-integration",
+    "test:nestjs": "vitest run --project nestjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check:publish": "pnpm -r run check:publish"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.2",
+    "@changesets/cli": "^2.31.0",
+    "@testcontainers/postgresql": "catalog:",
+    "@types/node": "^24.0.0",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
+  }
+}

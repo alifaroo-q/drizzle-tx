@@ -1,0 +1,30 @@
+{
+  // Typecheck-only program for the shared test harness and every integration test.
+  // These files live OUTSIDE the packages' `rootDir: "src"` build inputs (and the
+  // packages deliberately `exclude` `*.integration.test.ts`), so without this config
+  // they escape `tsc` entirely — type regressions in the harness ship silently.
+  // `--noEmit` only: emit-correctness flags (isolatedDeclarations / erasableSyntaxOnly /
+  // verbatimModuleSyntax) are intentionally off here; they constrain build output, not
+  // typechecking, and would fire spuriously on imported harness files.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2023",
+    "lib": ["ES2023", "ESNext.Disposable"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
+  },
+  "include": [
+    "vitest.config.ts",
+    "vitest.globalSetup.ts",
+    "vitest.dbPerWorker.ts",
+    "test/**/*.ts",
+    "packages/*/src/**/*.integration.test.ts"
+  ]
+}

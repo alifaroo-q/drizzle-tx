@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Reference clones (studied, not part of this repo)
+.reference/
+
+# Env & local
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Turbo/other caches
+.turbo/
+
+.claude/
