@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TransactionAdapter } from './adapter.js';
+import { NoOpDrizzleAdapter } from './noop-drizzle-adapter.js';
 import { Propagation } from './propagation.js';
 import { err, ok } from './result.js';
 import { TransactionManager } from './transaction-manager.js';
@@ -150,6 +151,84 @@ describe('TransactionManager', () => {
       return ok(null);
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignored'));
+  });
+});
+
+describe('TransactionManager with NoOpDrizzleAdapter', () => {
+  it('REQUIRED start commit + join emits one boundary and resolves the supplied client', async () => {
+    const client = { tag: 'client' };
+    const adapter = new NoOpDrizzleAdapter(client, { quiet: true });
+    const m = new TransactionManager(adapter);
+
+    const result = await m.withTransaction(async () => {
+      expect(m.getTransactionClient()).toBe(client);
+      const inner = await m.withTransaction(Propagation.Required, async () => {
+        expect(m.getTransactionClient()).toBe(client);
+        return ok(m.getTransactionClient().tag);
+      });
+      expect(inner).toEqual({ ok: true, value: 'client' });
+      return ok(m.getTransactionClient().tag);
+    });
+
+    expect(result).toEqual({ ok: true, value: 'client' });
+    expect(adapter.getBoundaryLog()).toEqual([{ kind: 'new-root', outcome: 'commit' }]);
+  });
+
+  it('REQUIRED start rollback returns domain err and records rollback boundary', async () => {
+    const adapter = new NoOpDrizzleAdapter({ tag: 'client' }, { quiet: true });
+    const m = new TransactionManager(adapter);
+
+    const result = await m.withTransaction(async () => err('DOMAIN_FAIL' as const));
+
+    expect(result).toEqual({ ok: false, error: 'DOMAIN_FAIL' });
+    expect(adapter.getBoundaryLog()).toEqual([{ kind: 'new-root', outcome: 'rollback' }]);
+  });
+
+  it('REQUIRES_NEW while active records its own boundary and preserves inner domain err', async () => {
+    const adapter = new NoOpDrizzleAdapter({ tag: 'client' }, { quiet: true });
+    const m = new TransactionManager(adapter);
+
+    const result = await m.withTransaction(async () => {
+      const inner = await m.withTransaction(Propagation.RequiresNew, async () =>
+        err('INNER_FAIL' as const),
+      );
+      return ok(inner);
+    });
+
+    expect(result).toEqual({ ok: true, value: { ok: false, error: 'INNER_FAIL' } });
+    expect(adapter.getBoundaryLog()).toEqual([
+      { kind: 'new-root', outcome: 'rollback' },
+      { kind: 'new-root', outcome: 'commit' },
+    ]);
+  });
+
+  it('NESTED while active records nested boundary outcomes for ok + err', async () => {
+    const adapter = new NoOpDrizzleAdapter({ tag: 'client' }, { quiet: true });
+    const m = new TransactionManager(adapter);
+
+    const commitCase = await m.withTransaction(async () => {
+      const nested = await m.withTransaction(Propagation.Nested, async () => ok('nested-ok'));
+      return ok(nested);
+    });
+    expect(commitCase).toEqual({ ok: true, value: { ok: true, value: 'nested-ok' } });
+    expect(adapter.getBoundaryLog()).toEqual([
+      { kind: 'nested', outcome: 'commit' },
+      { kind: 'new-root', outcome: 'commit' },
+    ]);
+
+    adapter.resetBoundaryLog();
+
+    const rollbackCase = await m.withTransaction(async () => {
+      const nested = await m.withTransaction(Propagation.Nested, async () =>
+        err('NESTED_FAIL' as const),
+      );
+      return ok(nested);
+    });
+    expect(rollbackCase).toEqual({ ok: true, value: { ok: false, error: 'NESTED_FAIL' } });
+    expect(adapter.getBoundaryLog()).toEqual([
+      { kind: 'nested', outcome: 'rollback' },
+      { kind: 'new-root', outcome: 'commit' },
+    ]);
   });
 });
 
