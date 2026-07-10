@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
-import { accounts, users } from '../../../test/schema.js';
-import { createTestDb, type TestDb } from '../../../vitest.dbPerWorker.js';
-import { DrizzleAdapter } from './drizzle-adapter.js';
-import { Propagation } from './propagation.js';
-import { err, ok } from './result.js';
-import { TransactionManager } from './transaction-manager.js';
-import { createTransactionalClient } from './transactional-client.js';
+import { accounts, users } from '../../../../test/schema.js';
+import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
+import { DrizzleAdapter } from '../../src/adapters/drizzle.js';
+import { Propagation } from '../../src/propagation.js';
+import { err, ok } from '../../src/result.js';
+import { TransactionManager } from '../../src/transaction-manager.js';
+import { createTransactionalClient } from '../../src/transactional-client.js';
 
 let t: TestDb;
 // biome-ignore lint/suspicious/noExplicitAny: transactional client is structurally typed in tests

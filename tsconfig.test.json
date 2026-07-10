@@ -25,6 +25,6 @@
     "vitest.globalSetup.ts",
     "vitest.dbPerWorker.ts",
     "test/**/*.ts",
-    "packages/*/src/**/*.integration.test.ts"
+    "packages/*/test/integration/**/*.integration.test.ts"
   ]
 }

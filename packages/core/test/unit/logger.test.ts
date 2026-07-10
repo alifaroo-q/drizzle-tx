@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { consoleLogger, noopLogger } from './logger.js';
+import { consoleLogger, noopLogger } from '../../src/logger.js';
 
 it('noopLogger.warn does nothing', () => {
   expect(() => noopLogger.warn('x')).not.toThrow();

@@ -1,5 +1,5 @@
-import { type DrizzleTxError, matchError } from './errors.js';
-import { assertNever } from './result.js';
+import { type DrizzleTxError, matchError } from '../../src/errors.js';
+import { assertNever } from '../../src/result.js';
 
 // If a variant is added without a case here, this fails to compile — proving exhaustiveness.
 export function describeError(e: DrizzleTxError): string {

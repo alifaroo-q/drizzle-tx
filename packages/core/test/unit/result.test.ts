@@ -11,7 +11,7 @@ import {
   ok,
   type Result,
   unwrapOr,
-} from './result.js';
+} from '../../src/result.js';
 
 describe('Result', () => {
   it('ok wraps a value with ok:true', () => {

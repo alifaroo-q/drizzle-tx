@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { accounts, users } from '../../../test/schema.js';
-import { createTestDb, type TestDb } from '../../../vitest.dbPerWorker.js';
+import { accounts, users } from '../../../../test/schema.js';
+import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
 
 let t: TestDb;
 beforeAll(async () => {

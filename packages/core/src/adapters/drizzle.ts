@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import type { TransactionAdapter } from './adapter.js';
-import type { TxOptions } from './options.js';
+import type { TxOptions } from '../options.js';
+import type { TransactionAdapter } from './port.js';
 
 /** Marker thrown when a pg pool connection acquisition times out (ADR-0002 fail-fast).
  *  The manager maps it to `DrizzleTxError.PoolConnectionTimeout` by constructor name,

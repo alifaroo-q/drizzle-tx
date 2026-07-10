@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { Propagation } from './propagation.js';
+import { Propagation } from '../../src/propagation.js';
 
 it('exposes the three v1 propagation modes as string values', () => {
   expect(Propagation.Required).toBe('REQUIRED');

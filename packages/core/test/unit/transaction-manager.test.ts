@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TransactionAdapter } from './adapter.js';
-import { NoOpDrizzleAdapter } from './noop-drizzle-adapter.js';
-import { Propagation } from './propagation.js';
-import { err, ok } from './result.js';
-import { TransactionManager } from './transaction-manager.js';
+import { NoOpDrizzleAdapter } from '../../src/adapters/noop.js';
+import type { TransactionAdapter } from '../../src/adapters/port.js';
+import { Propagation } from '../../src/propagation.js';
+import { err, ok } from '../../src/result.js';
+import { TransactionManager } from '../../src/transaction-manager.js';
 
 /** Fake client is just a tagged object; a new tag per BEGIN so we can assert identity. */
 type FakeClient = { readonly tag: string };

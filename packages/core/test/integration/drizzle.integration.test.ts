@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { users } from '../../../test/schema.js';
-import { createTestDb, type TestDb } from '../../../vitest.dbPerWorker.js';
-import { DrizzleAdapter } from './drizzle-adapter.js';
-import { ok } from './result.js';
-import { TransactionManager } from './transaction-manager.js';
+import { users } from '../../../../test/schema.js';
+import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
+import { DrizzleAdapter } from '../../src/adapters/drizzle.js';
+import { ok } from '../../src/result.js';
+import { TransactionManager } from '../../src/transaction-manager.js';
 
 let t: TestDb;
 // biome-ignore lint/suspicious/noExplicitAny: transactional client is structurally typed in tests

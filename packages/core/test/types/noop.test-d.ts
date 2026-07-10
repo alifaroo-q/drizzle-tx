@@ -1,4 +1,4 @@
-import { NoOpDrizzleAdapter } from './noop-drizzle-adapter.js';
+import { NoOpDrizzleAdapter } from '../../src/adapters/noop.js';
 
 type TestClient = {
   readonly tag: 'client';

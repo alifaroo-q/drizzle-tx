@@ -1,4 +1,4 @@
-import type { TxOptions } from './options.js';
+import type { TxOptions } from '../options.js';
 
 export interface TransactionAdapter<TClient> {
   /** The pool-backed base client (used outside a transaction and to start new top-level ones). */

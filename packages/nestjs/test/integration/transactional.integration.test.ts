@@ -3,11 +3,11 @@ import { type DrizzleTxError, err, ok, Propagation, type Result } from '@drizzle
 import { Inject, Injectable } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
-import { users } from '../../../test/schema.js';
-import { createTestDb, type TestDb } from '../../../vitest.dbPerWorker.js';
-import { DrizzleTransactionModule } from './drizzle-transaction.module.js';
-import { DRIZZLE_TX_CLIENT } from './tokens.js';
-import { Transactional } from './transactional.decorator.js';
+import { users } from '../../../../test/schema.js';
+import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
+import { DrizzleTransactionModule } from '../../src/drizzle-transaction.module.js';
+import { DRIZZLE_TX_CLIENT } from '../../src/tokens.js';
+import { Transactional } from '../../src/transactional.decorator.js';
 
 let t: TestDb;
 

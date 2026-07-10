@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { err, ok } from './result.js';
-import { classifyRollback, RollbackSignal, toThrowable } from './rollback-boundary.js';
+import { err, ok } from '../../src/result.js';
+import { classifyRollback, RollbackSignal, toThrowable } from '../../src/rollback-boundary.js';
 
 describe('toThrowable', () => {
   it('returns the value for ok', () => {

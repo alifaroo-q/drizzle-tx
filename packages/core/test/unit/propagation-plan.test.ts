@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Propagation } from './propagation.js';
-import { normalizeArgs, planTransaction } from './propagation-plan.js';
-import { ok } from './result.js';
+import { Propagation } from '../../src/propagation.js';
+import { normalizeArgs, planTransaction } from '../../src/propagation-plan.js';
+import { ok } from '../../src/result.js';
 
 describe('planTransaction', () => {
   it('REQUIRED + inactive → new-root carrying options', () => {

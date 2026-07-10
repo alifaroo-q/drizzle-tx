@@ -1,7 +1,8 @@
 {
   // Editor + typecheck config. This is the config tsserver auto-discovers for every file
-  // under `packages/nestjs/src` — INCLUDING `*.integration.test.ts`. It must apply
-  // `experimentalDecorators` to those test files, otherwise the editor puts them in an
+  // under `packages/nestjs` — both `src` and the relocated `test/` suite (INCLUDING
+  // `*.integration.test.ts`); there is no nearer `tsconfig.json`, so this one owns them.
+  // It must apply `experimentalDecorators` to those test files, otherwise the editor puts them in an
   // inferred project (no experimentalDecorators) and legacy 3-arg decorators like
   // `@Transactional` fail with TS1241 ("runtime will invoke the decorator with 2
   // arguments, but the decorator expects 3"). The root `tsconfig.test.json` fixes the CLI
@@ -14,9 +15,9 @@
   // references the packages fails with TS6305/TS6310 under the repo's load-bearing
   // `tsc -b --noEmit` typecheck. So test ownership is handled per-package here instead.
   //
-  // `noEmit` + non-composite (no `rootDir`) on purpose: the integration tests import the
-  // shared harness (`../../test/**`, `../../vitest.*`) which lives OUTSIDE `src`, so a
-  // `rootDir: "src"` emit config would reject those imports with TS6059. Emit is handled by
+  // `noEmit` + non-composite (no `rootDir`) on purpose: the tests live under `test/` (outside
+  // `src`) and import the shared harness (`../../../../test/**`, `../../../../vitest.*`), so a
+  // `rootDir: "src"` emit config would reject both with TS6059. Emit is handled by
   // the sibling `tsconfig.build.json` (node16, `rootDir: src`, excludes tests), which is
   // what the `build` script and the root `tsc -b` solution reference.
   //
@@ -38,6 +39,6 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": ["**/*.test-d.ts", "dist"]
 }

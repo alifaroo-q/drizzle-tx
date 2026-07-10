@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTransactionalClient } from './transactional-client.js';
+import { createTransactionalClient } from '../../src/transactional-client.js';
 
 describe('createTransactionalClient', () => {
   it('reads properties off the currently-active client (not a proxy receiver)', () => {

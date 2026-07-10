@@ -1,5 +1,5 @@
-import type { TxPlan } from './propagation-plan.js';
-import { assertNever } from './result.js';
+import type { TxPlan } from '../../src/propagation-plan.js';
+import { assertNever } from '../../src/result.js';
 
 // If a TxPlan variant is added without a case here, this fails to compile — proving exhaustiveness.
 export function describePlan(plan: TxPlan): string {

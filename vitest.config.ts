@@ -4,31 +4,30 @@ export default defineConfig({
   test: {
     projects: [
       {
-        // Core unit tests only (no decorators, no DB).
-        // NOTE: the `*.test.ts` glob also matches `*.integration.test.ts` filenames,
-        // so we MUST exclude integration tests here — they belong to core-integration
-        // (which has the container globalSetup). Without this, createTestDb() runs with
-        // no `adminUri` and beforeAll fails.
+        // Core unit tests only (no decorators, no DB). Live under test/unit/ —
+        // physically separated from the real-Postgres suite in test/integration/
+        // (which needs the container globalSetup), so no filename-based exclude is needed.
         test: {
           name: 'core-unit',
           globals: true,
           environment: 'node',
-          include: ['packages/core/src/**/*.test.ts'],
-          exclude: ['**/*.integration.test.ts'],
+          include: ['packages/core/test/unit/**/*.test.ts'],
           restoreMocks: true,
         },
       },
-      // ALL NestJS tests run under the package's OWN config, which applies
-      // unplugin-swc for decorator metadata. Referencing the config path here
+      // ALL NestJS tests run under the package's OWN configs, which apply
+      // unplugin-swc for decorator metadata. Referencing the config paths here
       // (not globbing nestjs files into a plain project) is REQUIRED — otherwise
-      // decorator DI silently breaks under the root runner.
-      'packages/nestjs',
+      // decorator DI silently breaks under the root runner. Two projects: the fast
+      // `nestjs-unit` (no DB, no globalSetup) and `nestjs-integration` (real Postgres).
+      'packages/nestjs/vitest.unit.config.ts',
+      'packages/nestjs/vitest.config.ts',
       {
         test: {
           name: 'core-integration',
           globals: true,
           environment: 'node',
-          include: ['packages/core/src/**/*.integration.test.ts'],
+          include: ['packages/core/test/integration/**/*.integration.test.ts'],
           globalSetup: ['./vitest.globalSetup.ts'],
           pool: 'forks',
           restoreMocks: true,

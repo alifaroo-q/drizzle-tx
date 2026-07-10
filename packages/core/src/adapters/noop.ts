@@ -1,7 +1,7 @@
-import type { TransactionAdapter } from './adapter.js';
-import type { TxLogger } from './logger.js';
-import { consoleLogger } from './logger.js';
-import type { TxOptions } from './options.js';
+import type { TxLogger } from '../logger.js';
+import { consoleLogger } from '../logger.js';
+import type { TxOptions } from '../options.js';
+import type { TransactionAdapter } from './port.js';
 
 export interface NoOpBoundaryLogEntry {
   readonly kind: 'new-root' | 'nested';

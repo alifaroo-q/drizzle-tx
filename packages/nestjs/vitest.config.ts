@@ -1,27 +1,20 @@
-import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
+import { swcPlugins } from './vitest.shared.js';
 
+// The `nestjs-integration` project: real-Postgres tests that boot a Nest module against a
+// Testcontainers database (started once via the shared globalSetup). The no-DB DI/CJS/no-op
+// tests live in the sibling `nestjs-unit` project (`vitest.unit.config.ts`), which skips the
+// container entirely. Both share the SWC transform from `vitest.shared.ts`; only this one
+// pays for globalSetup.
 export default defineConfig({
-  plugins: [
-    swc.vite({
-      module: { type: 'es6' },
-      jsc: {
-        target: 'es2022',
-        parser: { syntax: 'typescript', decorators: true },
-        transform: { legacyDecorator: true, decoratorMetadata: true },
-      },
-    }),
-  ],
-  // Vite 8 / Vitest 4 transform TypeScript with Oxc by default, which strips type
-  // annotations BEFORE unplugin-swc runs — leaving SWC's `decoratorMetadata` with no
-  // types, so `design:paramtypes` emits as `[undefined]` and type-based DI breaks.
-  // Disabling Oxc makes unplugin-swc the sole transformer (emitDecoratorMetadata works).
+  plugins: swcPlugins,
+  // Oxc would strip types before SWC emits decorator metadata — see vitest.shared.ts.
   oxc: false,
   test: {
-    name: 'nestjs',
+    name: 'nestjs-integration',
     globals: true,
     environment: 'node',
-    include: ['src/**/*.integration.test.ts'],
+    include: ['test/integration/**/*.integration.test.ts'],
     globalSetup: ['../../vitest.globalSetup.ts'],
     pool: 'forks',
     testTimeout: 30000,

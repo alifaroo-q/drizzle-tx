@@ -1,9 +1,9 @@
-export * from './adapter.js';
 export {
   DrizzleAdapter,
   type DrizzleAdapterConfig,
   type DrizzleTxCapable,
-} from './drizzle-adapter.js';
+} from './adapters/drizzle.js';
+export * from './adapters/port.js';
 export * from './errors.js';
 export * from './logger.js';
 export * from './options.js';

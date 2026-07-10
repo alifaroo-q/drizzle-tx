@@ -10,11 +10,11 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { expect, it } from 'vitest';
-import { DrizzleTransactionModule } from './drizzle-transaction.module.js';
-import { createNoOpTransactionManager } from './testing.js';
-import { DRIZZLE_TX_CLIENT, DRIZZLE_TX_MANAGER } from './tokens.js';
-import { TransactionHost } from './transaction-host.js';
-import { Transactional } from './transactional.decorator.js';
+import { DrizzleTransactionModule } from '../../src/drizzle-transaction.module.js';
+import { createNoOpTransactionManager } from '../../src/testing.js';
+import { DRIZZLE_TX_CLIENT, DRIZZLE_TX_MANAGER } from '../../src/tokens.js';
+import { TransactionHost } from '../../src/transaction-host.js';
+import { Transactional } from '../../src/transactional.decorator.js';
 
 // Seam 2 (per docs/prds — issue #1 Testing Decisions): drive the REAL @Transactional
 // decorator + DI graph through the `@drizzle-tx/nestjs/testing` override helper, with NO

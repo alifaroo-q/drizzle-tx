@@ -5,7 +5,7 @@ import {
   matchError,
   notPoolBacked,
   poolConnectionTimeout,
-} from './errors.js';
+} from '../../src/errors.js';
 
 describe('matchError', () => {
   const describe_ = (e: DrizzleTxError): string =>

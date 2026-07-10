@@ -1,17 +1,15 @@
-import type { TransactionAdapter } from './adapter.js';
+import type { TransactionAdapter } from './adapters/port.js';
 import type { DrizzleTxError } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
 import type { Propagation } from './propagation.js';
-import { normalizeArgs, planTransaction } from './propagation-plan.js';
+import { normalizeArgs, planTransaction, type TransactionWork } from './propagation-plan.js';
 import { err, ok, type Result } from './result.js';
 import { classifyRollback, toThrowable } from './rollback-boundary.js';
 import { TransactionContext } from './transaction-context.js';
 import { openScope, type TransactionScope } from './transaction-scope.js';
 
-/** A unit of transactional work: an async function returning an explicit `Result`.
- *  Returning `err(...)` triggers a rollback (ADR-0003). */
-export type TransactionWork<T, E> = () => Promise<Result<T, E>>;
+export type { TransactionWork } from './propagation-plan.js';
 
 export interface TransactionManagerOptions {
   readonly logger?: TxLogger;

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { type DrizzleTxError, ok, type Result } from '@drizzle-tx/core';
 import { expect, it } from 'vitest';
-import { Transactional } from './transactional.decorator.js';
+import { Transactional } from '../../src/transactional.decorator.js';
 
 class Svc {
   @Transactional()

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { NoOpDrizzleAdapter } from './noop-drizzle-adapter.js';
+import { NoOpDrizzleAdapter } from '../../src/adapters/noop.js';
 
 describe('NoOpDrizzleAdapter', () => {
   it('warns once on construction by default', () => {

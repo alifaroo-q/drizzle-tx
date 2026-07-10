@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TransactionContext } from './transaction-context.js';
+import { TransactionContext } from '../../src/transaction-context.js';
 
 describe('TransactionContext', () => {
   it('reports inactive with no current client outside run()', () => {

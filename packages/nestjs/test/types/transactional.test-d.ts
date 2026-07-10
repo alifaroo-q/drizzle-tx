@@ -1,5 +1,5 @@
 import type { DrizzleTxError, Result } from '@drizzle-tx/core';
-import { Transactional } from './transactional.decorator.js';
+import { Transactional } from '../../src/transactional.decorator.js';
 
 // GOOD: error union includes DrizzleTxError → compiles.
 class Good {
