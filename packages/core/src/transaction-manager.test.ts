@@ -202,6 +202,28 @@ describe('TransactionManager with NoOpDrizzleAdapter', () => {
     ]);
   });
 
+  it('REQUIRES_NEW while active commits its own boundary and resolves the supplied client', async () => {
+    const client = { tag: 'client' };
+    const adapter = new NoOpDrizzleAdapter(client, { quiet: true });
+    const m = new TransactionManager(adapter);
+
+    const result = await m.withTransaction(async () => {
+      expect(m.getTransactionClient()).toBe(client);
+      const inner = await m.withTransaction(Propagation.RequiresNew, async () => {
+        expect(m.getTransactionClient()).toBe(client);
+        return ok(m.getTransactionClient().tag);
+      });
+      expect(inner).toEqual({ ok: true, value: 'client' });
+      return ok(inner);
+    });
+
+    expect(result).toEqual({ ok: true, value: { ok: true, value: 'client' } });
+    expect(adapter.getBoundaryLog()).toEqual([
+      { kind: 'new-root', outcome: 'commit' },
+      { kind: 'new-root', outcome: 'commit' },
+    ]);
+  });
+
   it('NESTED while active records nested boundary outcomes for ok + err', async () => {
     const adapter = new NoOpDrizzleAdapter({ tag: 'client' }, { quiet: true });
     const m = new TransactionManager(adapter);
