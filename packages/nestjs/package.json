@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "type": "commonjs",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alifaroo-q/drizzle-tx.git",
+    "directory": "packages/nestjs"
+  },
+  "homepage": "https://github.com/alifaroo-q/drizzle-tx/tree/main/packages/nestjs#readme",
+  "bugs": "https://github.com/alifaroo-q/drizzle-tx/issues",
   "engines": {
     "node": ">=22.13"
   },

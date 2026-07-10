@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alifaroo-q/drizzle-tx.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/alifaroo-q/drizzle-tx/tree/main/packages/core#readme",
+  "bugs": "https://github.com/alifaroo-q/drizzle-tx/issues",
   "engines": {
     "node": ">=22.13"
   },
