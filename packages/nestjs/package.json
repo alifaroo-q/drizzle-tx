@@ -38,8 +38,8 @@
   "devDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
-    "@nestjs/testing": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/testing": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
     "drizzle-orm": "catalog:",
     "pg": "catalog:",
     "@types/pg": "catalog:",

@@ -18,7 +18,7 @@
     "check:publish": "pnpm -r run check:publish"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.2",
+    "@biomejs/biome": "2.5.3",
     "@changesets/cli": "^2.31.0",
     "@testcontainers/postgresql": "catalog:",
     "@types/node": "^26.1.1",
