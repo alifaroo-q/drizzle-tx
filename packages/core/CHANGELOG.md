@@ -1,5 +1,11 @@
 # @drizzle-tx/core
 
+## 0.1.1
+
+### Patch Changes
+
+- Add `repository`, `homepage`, and `bugs` fields to the published package manifests. npm provenance (generated on the CI OIDC publish) requires `repository.url` in `package.json` to match the building repository, so publishes without it fail with `E422 - Failed to validate repository information`.
+
 ## 0.1.0
 
 ### Minor Changes
