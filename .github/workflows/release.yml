@@ -8,7 +8,53 @@ permissions:
   contents: read
 
 jobs:
+  # Gate: only run the release job when a push can actually produce a release —
+  # i.e. it carries pending changesets (→ open/update the Version PR) or bumps a
+  # published package.json version (→ the merged Version PR that should publish).
+  # Docs/chore/CI pushes touch neither and skip the release job entirely, so they
+  # never hit changesets' re-publish-an-already-published-version crash
+  # (stale `npm info` + `@changesets/cli` reading pnpm's E403 as `.summary`). This
+  # decides from git alone — no npm reads — so it is immune to that staleness.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 0 } # need history to diff the push range
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          run() { echo "should_run=$1" >> "$GITHUB_OUTPUT"; echo "decision: $1 ($2)"; exit 0; }
+
+          # Manual dispatch is always an intentional release attempt.
+          [ "$EVENT" = "workflow_dispatch" ] && run true "workflow_dispatch"
+
+          # Pending changesets in the tree → changesets/action opens/updates the Version PR.
+          if ls .changeset/*.md >/dev/null 2>&1 && ls .changeset/*.md | grep -qv 'README\.md'; then
+            run true "pending changesets"
+          fi
+
+          # A version bump in any published manifest → the merged Version PR that publishes.
+          base="$BEFORE"
+          if ! git rev-parse -q --verify "${base}^{commit}" >/dev/null 2>&1; then
+            base="$(git rev-parse -q --verify HEAD~1 || true)"
+          fi
+          # Can't establish a diff base (e.g. branch (re)create) → run, never miss a release.
+          [ -z "$base" ] && run true "no diff base"
+          if git diff "$base" "$SHA" -- 'packages/*/package.json' | grep -qE '^\+[[:space:]]*"version":'; then
+            run true "package.json version changed"
+          fi
+
+          run false "no changesets or version bump"
+
   release:
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # changesets pushes the "Version Packages" PR / tags
