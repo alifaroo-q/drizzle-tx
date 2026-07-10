@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Keep SHA-pinned actions current, otherwise pinning silently rots.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # pnpm workspace deps; grouped to avoid PR spam. minimumReleaseAge in
+  # pnpm-workspace.yaml gates how fresh a version Dependabot may pull in.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ['minor', 'patch']

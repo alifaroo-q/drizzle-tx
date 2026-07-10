@@ -1,23 +1,33 @@
 name: Release
 on:
   push: { branches: [main] }
+
+# Least privilege by default; the release job opts into the writes it needs.
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write # OIDC → npm trusted publishing + provenance (PRD §Security)
+  contents: read
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # changesets pushes the "Version Packages" PR / tags
+      pull-requests: write # ...and opens/updates that PR
+      id-token: write # OIDC → npm trusted publishing + provenance (PRD §Security)
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # No persist-credentials:false here — changesets/action pushes to the repo.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: npm install -g npm@latest # ensure npm >= 11.5.1 for auto-provenance
       - run: pnpm build
-      - uses: changesets/action@v1
+      # Publish gate: a broken exports/types map can never reach npm even if a
+      # branch-protection bypass skipped CI.
+      - run: pnpm -r run check:publish
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           publish: pnpm changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true' # belt-and-suspenders; auto under trusted publishing
