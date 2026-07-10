@@ -1,6 +1,7 @@
 name: Release
 on:
   push: { branches: [main] }
+  workflow_dispatch: # allow manual re-trigger of a release run from the Actions tab
 
 # Least privilege by default; the release job opts into the writes it needs.
 permissions:
