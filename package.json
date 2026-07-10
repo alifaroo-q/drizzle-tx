@@ -21,7 +21,7 @@
     "@biomejs/biome": "2.5.2",
     "@changesets/cli": "^2.31.0",
     "@testcontainers/postgresql": "catalog:",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.1.1",
     "@types/pg": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
