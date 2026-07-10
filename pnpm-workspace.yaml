@@ -19,7 +19,7 @@ allowBuilds:
   ssh2: false # Testcontainers transport works without the native crypto build
 
 catalog:
-  typescript: 6.0.3
+  typescript: 7.0.2
   drizzle-orm: 1.0.0-rc.4
   drizzle-kit: 1.0.0-rc.4
   vitest: 4.1.10
