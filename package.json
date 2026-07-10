@@ -15,6 +15,7 @@
     "test:nestjs": "vitest run --project nestjs",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "prepare": "husky",
     "check:publish": "pnpm -r run check:publish"
   },
   "devDependencies": {
@@ -23,11 +24,12 @@
     "@testcontainers/postgresql": "catalog:",
     "@types/node": "^26.1.1",
     "@types/pg": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
+    "husky": "^9.1.7",
     "pg": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@vitest/coverage-v8": "catalog:"
+    "vitest": "catalog:"
   }
 }

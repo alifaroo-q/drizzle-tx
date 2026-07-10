@@ -13,7 +13,9 @@
   "types": "./dist/index.d.ts",
   "typesVersions": {
     "*": {
-      "testing": ["dist/testing.d.ts"]
+      "testing": [
+        "dist/testing.d.ts"
+      ]
     }
   },
   "exports": {
