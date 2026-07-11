@@ -1,1 +1,1 @@
-pnpm lint:fix
+mise exec -- pnpm lint:fix

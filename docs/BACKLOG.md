@@ -138,6 +138,20 @@ per-connection tokens), `transaction-host.ts` (key registry + `get(connectionNam
 
 ---
 
+## O — Transactional outbox (`enqueue` + relay)
+
+**What.** An optional outbox surface behind a `@drizzle-tx/core/outbox` subpath: a **producer** (`enqueue(event)`) that writes an event row through the ambient transactional client — atomic with the business writes by construction — and an engine-**independent** **relay** (`drainOnce()` + a `startRelay()` loop) that publishes committed events to a caller-supplied broker at-least-once. Default dispatch is polling (`SELECT … FOR UPDATE SKIP LOCKED`); CDC / logical replication is a deferred opt-in listener behind the same table contract.
+
+**Why deferred.** Depth-phase capstone, not v1 hardening — sequenced *after* the Next.js flagship adapter and the earlier depth features (hooks → retry → OTel). Highest-effort of the depth set (relay deployment modes, delivery/ordering guarantees, schema + purge strategy) and needs its own integration tests. Not a correctness gap in the engine — a "reliable event-driven backbone" expansion.
+
+**Design is fully settled — see [ADR-0008](adr/0008-transactional-outbox-poll-first-cdc-later.md)** (poll-first/CDC-later, at-least-once + consumer dedup, per-aggregate best-effort ordering, claim-by-`processed_at IS NULL` not `id > cursor`, publish-outside-transaction per ADR-0002, Debezium-superset schema). The seam is drawn so poll-only ships without foreclosing CDC.
+
+**Prior art.** `Zehelein/pg-transactional-outbox` (dual polling + logical-replication listeners, at-least-once, inbox/dedup); Debezium Outbox Event Router (table schema + routing key); microservices.io Transactional Outbox / Polling Publisher. Cited in ADR-0008.
+
+**Where our code changes.** New `@drizzle-tx/core/outbox` subpath (build entry + `exports` + `attw`/`publint` coverage); producer reuses the [transactional-client](../packages/core/src/transactional-client.ts) proxy; relay is standalone (raw Drizzle transactions on the base client, **no** ALS/manager import); optional-peer broker `publish` interface.
+
+---
+
 ## Notes
 
 - **G (no-op testing adapter)** is being addressed in the current grilling session.
