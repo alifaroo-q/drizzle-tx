@@ -15,6 +15,11 @@ describe('NoOpDrizzleAdapter', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('getBaseClient returns the client it was constructed with', () => {
+    const client = { id: 'c1' };
+    expect(new NoOpDrizzleAdapter(client, { quiet: true }).getBaseClient()).toBe(client);
+  });
+
   it('records boundary outcomes in order and supports reset', async () => {
     const client = { id: 'c1' };
     const adapter = new NoOpDrizzleAdapter(client, { quiet: true });

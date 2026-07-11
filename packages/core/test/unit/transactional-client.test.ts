@@ -26,4 +26,16 @@ describe('createTransactionalClient', () => {
     expect(proxy.value).toBe('tx'); // resolves live, per access
     expect(proxy.echo('b')).toBe('tx:b');
   });
+
+  it('the `has` trap reflects membership on the live client', () => {
+    let active: Record<string, unknown> = { alpha: 1 };
+    const proxy = createTransactionalClient<Record<string, unknown>>(() => active);
+
+    expect('alpha' in proxy).toBe(true);
+    expect('beta' in proxy).toBe(false);
+
+    active = { beta: 2 }; // swap the active client → membership tracks it live
+    expect('beta' in proxy).toBe(true);
+    expect('alpha' in proxy).toBe(false);
+  });
 });

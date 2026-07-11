@@ -152,6 +152,20 @@ describe('TransactionManager', () => {
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignored'));
   });
+
+  it('warns about ignored options when a REQUIRED call joins an existing transaction', async () => {
+    const { adapter, begins } = makeFakeAdapter();
+    const warn = vi.fn();
+    const m = new TransactionManager(adapter, { logger: { warn } });
+    await m.withTransaction(async () => {
+      await m.withTransaction(Propagation.Required, { isolationLevel: 'serializable' }, async () =>
+        ok(null),
+      );
+      return ok(null);
+    });
+    expect(begins).toEqual(['tx1']); // joined, no second BEGIN
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('joining an existing transaction'));
+  });
 });
 
 describe('TransactionManager with NoOpDrizzleAdapter', () => {
