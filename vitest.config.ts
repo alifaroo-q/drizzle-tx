@@ -2,6 +2,16 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Coverage applies across every project (a project run inherits this root config).
+    // Scoped to package source so test harnesses, configs and dist never skew the numbers.
+    // In Vitest 4 `include` already counts un-imported source files (e.g. the no-op adapter)
+    // as 0% — the removed `all` flag — so the report is a true map of what's exercised.
+    coverage: {
+      provider: 'v8',
+      include: ['packages/*/src/**'],
+      reporter: ['text', 'html'],
+      reportsDirectory: './coverage',
+    },
     projects: [
       {
         // Core unit tests only (no decorators, no DB). Live under test/unit/ —
