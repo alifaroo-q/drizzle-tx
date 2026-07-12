@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   connectionLost,
-  deadlockDetected,
   type DrizzleTxError,
+  deadlockDetected,
   hostNotInitialized,
   matchError,
   notPoolBacked,

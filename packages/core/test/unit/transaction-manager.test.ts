@@ -214,10 +214,7 @@ describe('TransactionManager — rollback double-fault (R2, ADR-0012 §2)', () =
         getBaseClient() {
           return {};
         }
-        async wrapWithTransaction<T>(
-          _o: unknown,
-          work: (tx: Record<string, never>) => Promise<T>,
-        ) {
+        async wrapWithTransaction<T>(_o: unknown, work: (tx: Record<string, never>) => Promise<T>) {
           return work({});
         }
         async wrapWithNestedTransaction<T>(

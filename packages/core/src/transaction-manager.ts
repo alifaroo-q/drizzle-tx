@@ -134,7 +134,10 @@ export class TransactionManager<TClient> {
   }
 
   #newTransaction<T, E>(options: TxOptions | undefined, work: TransactionWork<T, E>) {
-    return this.#runInBoundary<T, E>((run) => this.#adapter.wrapWithTransaction(options, run), work);
+    return this.#runInBoundary<T, E>(
+      (run) => this.#adapter.wrapWithTransaction(options, run),
+      work,
+    );
   }
 
   #nested<T, E>(work: TransactionWork<T, E>) {
