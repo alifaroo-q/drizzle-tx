@@ -52,7 +52,13 @@ describe('openScope', () => {
     // real DrizzleTxError rather than the internal rollback sentinel.
     const run: Runner = async (work) => {
       await work();
-      return err(transactionAborted(new Error('COMMIT failed')));
+      return err(
+        transactionAborted({
+          message: 'COMMIT failed',
+          sqlState: undefined,
+          cause: new Error('COMMIT failed'),
+        }),
+      );
     };
     const opened = await openScope(run, captureClient, { warn });
     if (!opened.ok) throw new Error('expected ok');
@@ -63,7 +69,14 @@ describe('openScope', () => {
   });
 
   it('returns err(TransactionAborted) when the tx errors before the client is captured', async () => {
-    const run: Runner = async () => err(transactionAborted(new Error('could not connect')));
+    const run: Runner = async () =>
+      err(
+        transactionAborted({
+          message: 'could not connect',
+          sqlState: undefined,
+          cause: new Error('could not connect'),
+        }),
+      );
     const opened = await openScope(run, captureClient, { warn: vi.fn() });
     expect(opened.ok).toBe(false);
     if (!opened.ok) expect(opened.error.kind).toBe('TransactionAborted');

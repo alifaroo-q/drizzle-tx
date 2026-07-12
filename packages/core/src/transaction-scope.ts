@@ -57,7 +57,13 @@ export async function openScope<TClient>(
   if (capturedClient === undefined) {
     const early = await settled;
     return early.ok
-      ? err(transactionAborted(new Error('transaction closed before it started')))
+      ? err(
+          transactionAborted({
+            message: 'transaction closed before it started',
+            sqlState: undefined,
+            cause: new Error('transaction closed before it started'),
+          }),
+        )
       : err(early.error as DrizzleTxError);
   }
 

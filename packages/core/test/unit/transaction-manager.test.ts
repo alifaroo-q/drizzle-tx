@@ -168,6 +168,72 @@ describe('TransactionManager', () => {
   });
 });
 
+describe('TransactionManager — rollback double-fault (R2, ADR-0012 §2)', () => {
+  // Adapter that lets work run, then throws a rollback-time failure that SHADOWS the RollbackSignal.
+  class RollbackShadowAdapter implements TransactionAdapter<Record<string, never>> {
+    supportsIndependentTransactions = true;
+    getBaseClient() {
+      return {};
+    }
+    async wrapWithTransaction<T>(
+      _o: unknown,
+      work: (tx: Record<string, never>) => Promise<T>,
+    ): Promise<T> {
+      await work({}).catch(() => {}); // work throws RollbackSignal(domainErr); swallow it
+      throw Object.assign(new Error('ROLLBACK failed'), { code: '08006', severity: 'ERROR' });
+    }
+    async wrapWithNestedTransaction<T>(
+      _p: Record<string, never>,
+      work: (sp: Record<string, never>) => Promise<T>,
+    ): Promise<T> {
+      await work({}).catch(() => {});
+      throw Object.assign(new Error('ROLLBACK TO SAVEPOINT failed'), {
+        code: '08006',
+        severity: 'ERROR',
+      });
+    }
+  }
+
+  it('infra error wins the channel, domain err preserved in lostDomainError', async () => {
+    const m = new TransactionManager<Record<string, never>>(new RollbackShadowAdapter(), {
+      logger: { warn() {} },
+    });
+    const domain = { kind: 'SoldOut' } as const;
+    const r = await m.withTransaction(async () => err(domain));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // infra failure wins the channel (classified from the 08006 shadow), domain E preserved:
+    expect(r.error).toMatchObject({ kind: 'ConnectionLost', lostDomainError: domain });
+  });
+
+  it('normal path: ROLLBACK succeeds → domain err returned faithfully, no lostDomainError', async () => {
+    // NoOp-style adapter that re-throws whatever work threw (RollbackSignal survives)
+    const m = new TransactionManager<Record<string, never>>(
+      new (class implements TransactionAdapter<Record<string, never>> {
+        supportsIndependentTransactions = true;
+        getBaseClient() {
+          return {};
+        }
+        async wrapWithTransaction<T>(
+          _o: unknown,
+          work: (tx: Record<string, never>) => Promise<T>,
+        ) {
+          return work({});
+        }
+        async wrapWithNestedTransaction<T>(
+          _p: Record<string, never>,
+          work: (sp: Record<string, never>) => Promise<T>,
+        ) {
+          return work({});
+        }
+      })(),
+      { logger: { warn() {} } },
+    );
+    const r = await m.withTransaction(async () => err({ kind: 'SoldOut' } as const));
+    expect(r).toEqual({ ok: false, error: { kind: 'SoldOut' } });
+  });
+});
+
 describe('TransactionManager with NoOpDrizzleAdapter', () => {
   it('REQUIRED start commit + join emits one boundary and resolves the supplied client', async () => {
     const client = { tag: 'client' };

@@ -109,25 +109,35 @@ export class TransactionManager<TClient> {
     options: TxOptions | undefined,
     work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
+    let inFlight: { error: E } | undefined;
     try {
       const value = await this.#adapter.wrapWithTransaction(options, (tx) =>
-        this.#ctx.run(tx, async () => toThrowable(await work())),
+        this.#ctx.run(tx, async () => {
+          const r = await work();
+          if (!r.ok) inFlight = { error: r.error };
+          return toThrowable(r);
+        }),
       );
       return ok(value);
     } catch (e) {
-      return classifyRollback<E>(e);
+      return classifyRollback<E>(e, inFlight);
     }
   }
 
   async #nested<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>> {
     const parent = this.getTransactionClient();
+    let inFlight: { error: E } | undefined;
     try {
       const value = await this.#adapter.wrapWithNestedTransaction(parent, (sp) =>
-        this.#ctx.run(sp, async () => toThrowable(await work())),
+        this.#ctx.run(sp, async () => {
+          const r = await work();
+          if (!r.ok) inFlight = { error: r.error };
+          return toThrowable(r);
+        }),
       );
       return ok(value);
     } catch (e) {
-      return classifyRollback<E>(e);
+      return classifyRollback<E>(e, inFlight);
     }
   }
 
