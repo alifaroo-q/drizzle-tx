@@ -20,9 +20,12 @@ export function socketError(opts?: { message?: string; code?: string }): Error {
   return e;
 }
 
-export const pgSerializationFailure = () => fakePgError('40001', 'could not serialize access');
-export const pgDeadlock = () => fakePgError('40P01', 'deadlock detected');
-export const pgAdminShutdown = () =>
+type FakePgError = ReturnType<typeof fakePgError>;
+
+export const pgSerializationFailure = (): FakePgError =>
+  fakePgError('40001', 'could not serialize access');
+export const pgDeadlock = (): FakePgError => fakePgError('40P01', 'deadlock detected');
+export const pgAdminShutdown = (): FakePgError =>
   fakePgError('57P01', 'terminating connection due to administrator command');
 
 export type TxPhase =
@@ -96,14 +99,17 @@ export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter
     return this;
   }
 
-  wrapWithTransaction<T>(
-    _o: TxOptions | undefined,
-    work: (tx: TClient) => Promise<T>,
-  ): Promise<T> {
+  wrapWithTransaction<T>(_o: TxOptions | undefined, work: (tx: TClient) => Promise<T>): Promise<T> {
     return this.#boundary('new-root', 'begin', 'commit', 'rollback', work);
   }
   wrapWithNestedTransaction<T>(_p: TClient, work: (sp: TClient) => Promise<T>): Promise<T> {
-    return this.#boundary('nested', 'savepoint', 'release-savepoint', 'rollback-to-savepoint', work);
+    return this.#boundary(
+      'nested',
+      'savepoint',
+      'release-savepoint',
+      'rollback-to-savepoint',
+      work,
+    );
   }
 
   #arm(phase: TxPhase, v: unknown | FaultInjection): void {
@@ -156,7 +162,11 @@ export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter
     }
   }
 
-  #log(kind: FaultBoundaryLogEntry['kind'], outcome: 'commit' | 'rollback', failedAt?: TxPhase): void {
+  #log(
+    kind: FaultBoundaryLogEntry['kind'],
+    outcome: 'commit' | 'rollback',
+    failedAt?: TxPhase,
+  ): void {
     this.#boundaryLog.push(failedAt ? { kind, outcome, failedAt } : { kind, outcome });
   }
 }
