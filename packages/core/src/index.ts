@@ -4,6 +4,12 @@ export {
   type DrizzleTxCapable,
 } from './adapters/drizzle.js';
 export * from './adapters/port.js';
+export {
+  type CreateDrizzleTxOptions,
+  createDrizzleTx,
+  type DrizzleTx,
+} from './create-drizzle-tx.js';
+export { UnsupportedDriverError } from './driver-capability.js';
 export * from './errors.js';
 export * from './logger.js';
 export * from './options.js';

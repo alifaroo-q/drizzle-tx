@@ -14,6 +14,7 @@ pnpm add @drizzle-tx/core drizzle-orm pg
 
 ## What's in the box
 
+- `createDrizzleTx({ drizzle })` — the single canonical assembly path: wires the manager + adapter + transactional client and returns `{ db, withTransaction, begin, isActive, manager }`. Throws `UnsupportedDriverError` at construction for a driver that can't host interactive transactions (Neon HTTP). See [`createDrizzleTx`](#createdrizzletx--the-canonical-assembly-path) below.
 - `TransactionManager` — the `AsyncLocalStorage` engine + the `REQUIRED` / `REQUIRES_NEW` / `NESTED` propagation switch, plus rollback-via-`err`. `withTransaction(work)` is the callback/ALS path; `begin()` returns an `await using` scope (`TransactionScope`, rollback-unless-`commit()`).
 - `DrizzleAdapter` — the async `node-postgres` adapter (`wrapWithTransaction` / `wrapWithNestedTransaction` / `getBaseClient`), with Pool-backed detection and pool-timeout → `PoolConnectionTimeout` mapping.
 - `createTransactionalClient(resolve)` — a transparent `Proxy` that resolves each access to the currently-active transaction (or the base client), binding methods to the real instance so private-field access works.
@@ -65,6 +66,31 @@ await using scope = opened.value;
 await scope.tx.insert(users).values({ name: 'Ada' });
 scope.commit();                                          // omit → rollback on scope exit
 ```
+
+### `createDrizzleTx` — the canonical assembly path
+
+The wiring above (manager + adapter + transactional client) collapses into one factory. Every surface (the NestJS adapter today; tRPC / Next next) builds on it, so defaults can't drift between them:
+
+```ts
+import { createDrizzleTx } from '@drizzle-tx/core';
+import { drizzle } from 'drizzle-orm/node-postgres';
+
+export const { db, withTransaction, begin, isActive, manager } = createDrizzleTx({
+  drizzle: drizzle({ client: pool, relations }),
+});
+// `db` is the transactional client (auto-joins the active tx) — import it in repositories.
+```
+
+**Driver matrix** — an interactive transaction needs a real TCP connection, so the adapters are **Node-runtime only** (edge can't open a pg pool; ADR-0009):
+
+| Driver | Interactive tx / `REQUIRES_NEW` |
+|---|---|
+| node-postgres `pg.Pool` | ✅ full — primary target |
+| neon-serverless (WebSocket Pool) | ✅ full — serverless-friendly |
+| **neon-http** | ❌ **hard-unsupported** — `createDrizzleTx` throws `UnsupportedDriverError` at construction |
+| PgBouncer / Supavisor *transaction* mode | ⚠️ `REQUIRED` works with `prepare:false`; `REQUIRES_NEW` draws a 2nd pooled backend → double connection pressure |
+
+Neon HTTP is one-shot / non-interactive — switch to `drizzle-orm/neon-serverless` (WebSocket) for transactions. The gate fails fast and clearly at assembly rather than mysteriously at the first query (ADR-0010).
 
 ## Building a new adapter
 
