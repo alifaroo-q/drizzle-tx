@@ -92,6 +92,18 @@ export const { db, withTransaction, begin, isActive, manager } = createDrizzleTx
 
 Neon HTTP is one-shot / non-interactive — switch to `drizzle-orm/neon-serverless` (WebSocket) for transactions. The gate fails fast and clearly at assembly rather than mysteriously at the first query (ADR-0010).
 
+## Testing
+
+`@drizzle-tx/core/testing` ships two in-process adapters so most behavior is testable without Docker. Pick the vehicle by what you're actually asserting:
+
+### Which testing adapter for which assertion
+
+| Want to assert… | Use |
+|---|---|
+| which propagation boundary was taken (wiring) | `NoOpDrizzleAdapter` + `getBoundaryLog()` |
+| a `DrizzleTxError` variant / SQLSTATE classification | `FaultInjectingDrizzleAdapter` + `fakePgError` |
+| real commit/rollback **data** effects | real Postgres (Testcontainers) |
+
 ## Building a new adapter
 
 Implement `TransactionAdapter<TClient>` for another ORM/driver and hand it to `TransactionManager`. The engine owns the ALS context and propagation; the adapter only knows how to start a top-level transaction, start a savepoint, and return the base client.
