@@ -3,7 +3,10 @@ import { FaultInjectingDrizzleAdapter, type TxPhase } from '../../src/adapters/f
 type TestClient = { readonly tag: 'client'; query(sql: string): Promise<number> };
 declare const client: TestClient;
 
-const a = new FaultInjectingDrizzleAdapter(client, { failAt: { commit: new Error('x') }, quiet: true });
+const a = new FaultInjectingDrizzleAdapter(client, {
+  failAt: { commit: new Error('x') },
+  quiet: true,
+});
 const base: TestClient = a.getBaseClient();
 void base;
 
