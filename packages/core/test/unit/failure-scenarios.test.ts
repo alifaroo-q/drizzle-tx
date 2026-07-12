@@ -34,7 +34,9 @@ describe('T2: failure-scenario classification matrix', () => {
   });
 
   it('R2: domain err + ROLLBACK double-fault → infra wins, lostDomainError preserved', async () => {
-    const r = await run({ rollback: fakePgError('57P01') }, async () => err({ kind: 'DomainX' } as const));
+    const r = await run({ rollback: fakePgError('57P01') }, async () =>
+      err({ kind: 'DomainX' } as const),
+    );
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toMatchObject({
