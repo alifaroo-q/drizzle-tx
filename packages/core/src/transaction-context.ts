@@ -7,7 +7,12 @@ interface ActiveTx<TClient> {
 
 /** Deep module over AsyncLocalStorage: hides the store shape and the run()-only rule
  *  (enterWith is forbidden — ADR-0001). The store is constructed immutable; there is no
- *  setter for the client. */
+ *  setter for the client.
+ *
+ *  ADR-0013 §3 (load-bearing): the store is immutable — `ActiveTx` is constructed once with
+ *  readonly fields only, "presence == active", no setter, no `active` flag. Any future lifecycle
+ *  machinery (hooks/OTel/retry) attaches BESIDE this store keyed by tx-identity — NEVER as a
+ *  mutable collection inside it. Metadata added later (depth/mode) must be readonly-only. */
 export class TransactionContext<TClient> {
   readonly #als = new AsyncLocalStorage<ActiveTx<TClient>>();
 
