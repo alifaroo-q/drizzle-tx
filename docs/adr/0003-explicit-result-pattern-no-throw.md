@@ -1,5 +1,7 @@
 # Explicit Result pattern — the library never throws for modeled conditions
 
+> **Scope annotation ([ADR-0011](0011-result-is-the-core-adapter-author-contract.md)):** this "never throw" contract binds **core + adapter-authors**. App-developer edges are *not* obligated to `Result` — each either bridges to its host's native convention ([ADR-0009](0009-framework-adapters-node-only-and-result-throw-bridge.md): tRPC→throw, Server Action→return `Result`) or is a deliberately-chosen Result-native surface (the NestJS service layer below, raw `withTransaction`). The bridge is never imposed.
+
 `@drizzle-tx/*` uses an explicit `Result<T, E>` pattern throughout. Fallible operations return `ok(value)` or `err(error)`; the engine does **not** throw for modeled conditions. The only `throw` in the whole flow is an internal signal used to trigger a Drizzle rollback, caught at the same boundary and converted back to a `Result` — so no throw escapes the engine. All error variants are modeled as an exhaustive discriminated union and matched with `assertNever` for compile-time completeness.
 
 ## Why
