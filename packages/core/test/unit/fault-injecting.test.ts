@@ -7,6 +7,7 @@ import {
   pgSerializationFailure,
   socketError,
 } from '../../src/adapters/fault-injecting.js';
+import { Propagation } from '../../src/propagation.js';
 import { err, ok } from '../../src/result.js';
 import { classifyCaught } from '../../src/rollback-boundary.js';
 import { TransactionManager } from '../../src/transaction-manager.js';
@@ -123,7 +124,10 @@ describe('FaultInjectingDrizzleAdapter — new-root', () => {
   });
 
   it('failOnce: fails first commit, succeeds on the second call', async () => {
-    const a = new FaultInjectingDrizzleAdapter({}, { quiet: true }).failOnce('commit', pgDeadlock());
+    const a = new FaultInjectingDrizzleAdapter({}, { quiet: true }).failOnce(
+      'commit',
+      pgDeadlock(),
+    );
     const r1 = await mgr(a).withTransaction(async () => ok('a'));
     const r2 = await mgr(a).withTransaction(async () => ok('b'));
     expect(r1.ok).toBe(false);
@@ -138,5 +142,72 @@ describe('FaultInjectingDrizzleAdapter — new-root', () => {
     a.clear('commit');
     const r = await mgr(a).withTransaction(async () => ok('x'));
     expect(r).toEqual({ ok: true, value: 'x' });
+  });
+});
+
+describe('FaultInjectingDrizzleAdapter — R2 shadowing + nested', () => {
+  it('domain err + ROLLBACK fault → infra wins, domain E preserved in lostDomainError', async () => {
+    const a = new FaultInjectingDrizzleAdapter(
+      {},
+      { failAt: { rollback: pgAdminShutdown() }, quiet: true },
+    );
+    const r = await mgr(a).withTransaction(async () => err({ kind: 'NotFound' } as const));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatchObject({
+      kind: 'ConnectionLost',
+      sqlState: '57P01',
+      lostDomainError: { kind: 'NotFound' },
+    });
+    expect(a.getBoundaryLog()).toEqual([
+      { kind: 'new-root', outcome: 'rollback', failedAt: 'rollback' },
+    ]);
+  });
+
+  it('domain err + successful rollback (no fault) → domain E returned faithfully, no lostDomainError', async () => {
+    const a = new FaultInjectingDrizzleAdapter({}, { quiet: true });
+    const r = await mgr(a).withTransaction(async () => err({ kind: 'SoldOut' } as const));
+    expect(r).toEqual({ ok: false, error: { kind: 'SoldOut' } });
+    expect(a.getBoundaryLog()).toEqual([{ kind: 'new-root', outcome: 'rollback' }]); // no failedAt
+  });
+
+  it('NESTED: ROLLBACK TO SAVEPOINT fault (socket) → ConnectionLost, undefined sqlState, E preserved', async () => {
+    // Outer REQUIRED joins nothing yet; run an outer tx, then a NESTED child that errs while its
+    // savepoint-rollback is faulted. The child boundary is the 'nested' entry.
+    const a = new FaultInjectingDrizzleAdapter(
+      {},
+      { failAt: { 'rollback-to-savepoint': socketError() }, quiet: true },
+    );
+    const m = mgr(a);
+    const r = await m.withTransaction(async () =>
+      m.withTransaction(Propagation.Nested, async () => err({ kind: 'BadChild' } as const)),
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatchObject({
+      kind: 'ConnectionLost',
+      sqlState: undefined,
+      lostDomainError: { kind: 'BadChild' },
+    });
+    // the nested boundary logged the savepoint-rollback fault:
+    expect(
+      a.getBoundaryLog().some((e) => e.kind === 'nested' && e.failedAt === 'rollback-to-savepoint'),
+    ).toBe(true);
+  });
+
+  it('SAVEPOINT fault → nested work never runs', async () => {
+    const a = new FaultInjectingDrizzleAdapter(
+      {},
+      { failAt: { savepoint: pgAdminShutdown() }, quiet: true },
+    );
+    const m = mgr(a);
+    let childRan = false;
+    await m.withTransaction(async () =>
+      m.withTransaction(Propagation.Nested, async () => {
+        childRan = true;
+        return ok(1);
+      }),
+    );
+    expect(childRan).toBe(false);
   });
 });
