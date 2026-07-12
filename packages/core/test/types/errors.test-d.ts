@@ -6,6 +6,12 @@ export function describeError(e: DrizzleTxError): string {
   switch (e.kind) {
     case 'PoolConnectionTimeout':
       return `pool timeout after ${e.timeoutMs}ms`;
+    case 'SerializationFailure':
+      return `serialization ${e.sqlState}`;
+    case 'DeadlockDetected':
+      return `deadlock ${e.sqlState}`;
+    case 'ConnectionLost':
+      return `connection lost: ${e.message}`;
     case 'TransactionAborted':
       return 'aborted';
     case 'HostNotInitialized':
@@ -21,6 +27,9 @@ export function describeError(e: DrizzleTxError): string {
 export const matchOk = (e: DrizzleTxError): string =>
   matchError(e, {
     PoolConnectionTimeout: () => 'timeout',
+    SerializationFailure: () => 'serialization',
+    DeadlockDetected: () => 'deadlock',
+    ConnectionLost: () => 'connection-lost',
     TransactionAborted: () => 'aborted',
     HostNotInitialized: () => 'host',
     NotPoolBacked: () => 'not-pool',
@@ -31,6 +40,9 @@ export const matchBad = (e: DrizzleTxError): string =>
   // @ts-expect-error — handler map must cover every DrizzleTxError kind
   matchError(e, {
     PoolConnectionTimeout: () => 'timeout',
+    SerializationFailure: () => 'serialization',
+    DeadlockDetected: () => 'deadlock',
+    ConnectionLost: () => 'connection-lost',
     TransactionAborted: () => 'aborted',
     HostNotInitialized: () => 'host',
   });
