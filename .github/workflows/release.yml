@@ -56,6 +56,13 @@ jobs:
     needs: gate
     if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
+    # Disable Husky for the whole job: changesets/action's "Version Packages" commit runs
+    # `git commit`, which fires the `.husky/pre-commit` hook (`mise exec -- pnpm lint:fix`).
+    # CI has no `mise` on PATH → the hook exits 127 and fails the commit → the release job
+    # dies before it can open the Version PR. Hooks are a local-dev convenience; skip them
+    # here (husky v9 honors HUSKY=0 via `.husky/_/h`).
+    env:
+      HUSKY: 0
     permissions:
       contents: write # changesets pushes the "Version Packages" PR / tags
       pull-requests: write # ...and opens/updates that PR
