@@ -66,28 +66,35 @@ describe('classifyRollback — structural SQLSTATE classification (ADR-0012 §3)
     );
   });
 
-  it.each(['08000', '08006', '08P01', '57P01', '57P03'])(
-    '%s → ConnectionLost with sqlState',
-    (code) => {
-      expect(
-        (classifyRollback(dbErr(code)) as { error: { kind: string; sqlState: string } }).error,
-      ).toMatchObject({ kind: 'ConnectionLost', sqlState: code });
-    },
-  );
+  it.each([
+    '08000',
+    '08006',
+    '08P01',
+    '57P01',
+    '57P03',
+  ])('%s → ConnectionLost with sqlState', (code) => {
+    expect(
+      (classifyRollback(dbErr(code)) as { error: { kind: string; sqlState: string } }).error,
+    ).toMatchObject({ kind: 'ConnectionLost', sqlState: code });
+  });
 
-  it.each(['ECONNRESET', 'EPIPE', 'ETIMEDOUT'])(
-    'libuv %s → ConnectionLost with UNDEFINED sqlState (socket checked first)',
-    (code) => {
-      expect(
-        (classifyRollback(sockErr(code)) as { error: { kind: string; sqlState: undefined } }).error,
-      ).toMatchObject({ kind: 'ConnectionLost', sqlState: undefined });
-    },
-  );
+  it.each([
+    'ECONNRESET',
+    'EPIPE',
+    'ETIMEDOUT',
+  ])('libuv %s → ConnectionLost with UNDEFINED sqlState (socket checked first)', (code) => {
+    expect(
+      (classifyRollback(sockErr(code)) as { error: { kind: string; sqlState: undefined } }).error,
+    ).toMatchObject({ kind: 'ConnectionLost', sqlState: undefined });
+  });
 
   it('code-less "Connection terminated unexpectedly" → ConnectionLost, undefined sqlState', () => {
     expect(
-      (classifyRollback(new Error('Connection terminated unexpectedly')) as { error: { kind: string } })
-        .error.kind,
+      (
+        classifyRollback(new Error('Connection terminated unexpectedly')) as {
+          error: { kind: string };
+        }
+      ).error.kind,
     ).toBe('ConnectionLost');
   });
 
@@ -121,5 +128,17 @@ describe('classifyRollback — structural SQLSTATE classification (ADR-0012 §3)
       ok: false,
       error: { kind: 'SoldOut' },
     });
+  });
+
+  it('wrapped DrizzleQueryError → classified by the nested pg DatabaseError (cause chain)', () => {
+    // Drizzle wraps a COMMIT/query failure; the pg fields live one .cause down, not on top.
+    const pgErr = dbErr('40001', 'could not serialize access');
+    const wrapped = Object.assign(new Error('Failed query: commit'), {
+      name: 'DrizzleQueryError',
+      cause: pgErr,
+    });
+    expect(
+      (classifyRollback(wrapped) as { error: { kind: string; sqlState: string } }).error,
+    ).toMatchObject({ kind: 'SerializationFailure', sqlState: '40001' });
   });
 });
