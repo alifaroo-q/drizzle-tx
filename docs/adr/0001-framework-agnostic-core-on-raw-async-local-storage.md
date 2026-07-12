@@ -16,4 +16,4 @@ The reason this package exists is to support **multiple web frameworks** (NestJS
 
 - We re-implement (and must test) the propagation state machine ourselves; v1 scopes this to REQUIRED / REQUIRES_NEW / NESTED to keep that surface small.
 - `@drizzle-tx/core` must have **zero** runtime dependency on `nestjs-cls` or `@nestjs/*` — enforced as an acceptance criterion.
-- Use `run()`, never `enterWith()`, to avoid context leakage.
+- Use `run()`, never `enterWith()`, to avoid context leakage. **Consequence ([ADR-0014](0014-two-primitive-split-and-scope-robustness.md)):** because ALS needs a callback and `enterWith` is forbidden, the `await using` scope cannot set ALS — hence the deliberate two-primitive split (callback `withTransaction` = implicit propagation; `begin()`/scope = explicit `scope.tx`, no auto-join). No propagation-preserving scope is built.
