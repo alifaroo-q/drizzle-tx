@@ -33,6 +33,9 @@ export class TransactionManager<TClient> {
     return this.#ctx.isActive();
   }
 
+  /** NOTE (R1, ADR-0012): a work fn returning `ok(value)` can still resolve to `err(...)` —
+   *  COMMIT runs inside the transaction boundary, so a deferred-constraint or serialization
+   *  failure at commit surfaces as the classified variant (e.g. SerializationFailure at commit). */
   // Overloads mirror the imperative API.
   withTransaction<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
@@ -61,6 +64,8 @@ export class TransactionManager<TClient> {
    *  Returns `err(...)` — never throws — if the transaction cannot be started. The scope
    *  rolls back on dispose unless `commit()` is called. The connection is held open for the
    *  scope's lifetime (like a manual `BEGIN`), so pool-sizing/deadlock caveats apply (ADR-0002).
+   *  NOTE (R1, ADR-0012): a `commit()`ed scope can still fail at COMMIT (deferred-constraint /
+   *  serialization); that settle failure is surfaced via the logger, not as a Result here.
    *
    *  ```ts
    *  const opened = await manager.begin();
