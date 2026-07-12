@@ -110,14 +110,18 @@ export class TransactionManager<TClient> {
     }
   }
 
-  async #newTransaction<T, E>(
-    options: TxOptions | undefined,
+  /** The one transaction boundary: enter the adapter's wrap, run `work` in an immutable ALS
+   *  context, translate err↔throw, and classify any caught failure — preserving a shadowed
+   *  domain error (R2). Both new-root and nested transactions run through HERE (ADR-0013 §4),
+   *  so the future lifecycle-observation seam and the retry loop attach in ONE place. */
+  async #runInBoundary<T, E>(
+    wrap: (run: (client: TClient) => Promise<T>) => Promise<T>,
     work: TransactionWork<T, E>,
   ): Promise<Result<T, E | DrizzleTxError>> {
     let inFlight: { error: E } | undefined;
     try {
-      const value = await this.#adapter.wrapWithTransaction(options, (tx) =>
-        this.#ctx.run(tx, async () => {
+      const value = await wrap((client) =>
+        this.#ctx.run(client, async () => {
           const r = await work();
           if (!r.ok) inFlight = { error: r.error };
           return toThrowable(r);
@@ -129,21 +133,16 @@ export class TransactionManager<TClient> {
     }
   }
 
-  async #nested<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>> {
+  #newTransaction<T, E>(options: TxOptions | undefined, work: TransactionWork<T, E>) {
+    return this.#runInBoundary<T, E>((run) => this.#adapter.wrapWithTransaction(options, run), work);
+  }
+
+  #nested<T, E>(work: TransactionWork<T, E>) {
     const parent = this.getTransactionClient();
-    let inFlight: { error: E } | undefined;
-    try {
-      const value = await this.#adapter.wrapWithNestedTransaction(parent, (sp) =>
-        this.#ctx.run(sp, async () => {
-          const r = await work();
-          if (!r.ok) inFlight = { error: r.error };
-          return toThrowable(r);
-        }),
-      );
-      return ok(value);
-    } catch (e) {
-      return classifyRollback<E>(e, inFlight);
-    }
+    return this.#runInBoundary<T, E>(
+      (run) => this.#adapter.wrapWithNestedTransaction(parent, run),
+      work,
+    );
   }
 
   #warnIgnoredOptions(context: string): void {
