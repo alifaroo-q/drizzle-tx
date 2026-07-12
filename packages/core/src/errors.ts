@@ -1,16 +1,42 @@
+/** Structured fields carried by every transaction-body failure (ADR-0012 §1). */
+export interface TxFailureFields {
+  readonly message: string;
+  readonly sqlState: string | undefined;
+  readonly cause: unknown;
+  /** R2: the swallowed domain error when a rollback double-fault ate it. Distinct from `cause`. */
+  readonly lostDomainError?: unknown;
+}
+
 export type DrizzleTxError =
+  // assembly / pool — no structured triad:
   | { readonly kind: 'PoolConnectionTimeout'; readonly timeoutMs: number | undefined }
-  | { readonly kind: 'TransactionAborted'; readonly cause: unknown }
   | { readonly kind: 'HostNotInitialized'; readonly connectionName: string | undefined }
-  | { readonly kind: 'NotPoolBacked' };
+  | { readonly kind: 'NotPoolBacked' }
+  // transaction-body failures — all carry TxFailureFields:
+  | ({ readonly kind: 'SerializationFailure' } & TxFailureFields)
+  | ({ readonly kind: 'DeadlockDetected' } & TxFailureFields)
+  | ({ readonly kind: 'ConnectionLost' } & TxFailureFields)
+  | ({ readonly kind: 'TransactionAborted' } & TxFailureFields);
 
 export const poolConnectionTimeout = (timeoutMs: number | undefined): DrizzleTxError => ({
   kind: 'PoolConnectionTimeout',
   timeoutMs,
 });
-export const transactionAborted = (cause: unknown): DrizzleTxError => ({
+export const serializationFailure = (f: TxFailureFields): DrizzleTxError => ({
+  kind: 'SerializationFailure',
+  ...f,
+});
+export const deadlockDetected = (f: TxFailureFields): DrizzleTxError => ({
+  kind: 'DeadlockDetected',
+  ...f,
+});
+export const connectionLost = (f: TxFailureFields): DrizzleTxError => ({
+  kind: 'ConnectionLost',
+  ...f,
+});
+export const transactionAborted = (f: TxFailureFields): DrizzleTxError => ({
   kind: 'TransactionAborted',
-  cause,
+  ...f,
 });
 export const hostNotInitialized = (connectionName: string | undefined): DrizzleTxError => ({
   kind: 'HostNotInitialized',
