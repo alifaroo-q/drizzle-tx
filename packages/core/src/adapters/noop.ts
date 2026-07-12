@@ -13,6 +13,12 @@ export interface NoOpDrizzleAdapterOptions {
   readonly quiet?: boolean;
 }
 
+/** Asserts propagation **decisions** via `getBoundaryLog()` — which boundaries were entered and
+ *  their commit/rollback outcome. It does **not** issue SQL, persist data, or roll back mutations:
+ *  `err(...)` yields a faithful `Result`, but the mock client is simply never changed. **Do not
+ *  assert data effects or failure classification against this adapter** — a "rolled back"
+ *  assertion on mutated mock state false-passes. For data-effect assertions use real Postgres;
+ *  for failure / `DrizzleTxError` classification use `FaultInjectingDrizzleAdapter`. */
 export class NoOpDrizzleAdapter<TClient> implements TransactionAdapter<TClient> {
   readonly #client: TClient;
   readonly #logger: TxLogger;
