@@ -1,7 +1,7 @@
 import {
   connectionLost,
-  deadlockDetected,
   type DrizzleTxError,
+  deadlockDetected,
   poolConnectionTimeout,
   serializationFailure,
   transactionAborted,
@@ -60,31 +60,47 @@ const messageOf = (e: unknown): string =>
     ? (e as { message: string }).message
     : String(e);
 
-/** A pg DatabaseError is recognised structurally: a 5-char string `.code` with a string `.severity`. */
+/** Walk the `.cause` chain (bounded) so a wrapped driver error is still classified by the
+ *  underlying pg/socket markers rather than the opaque wrapper. Drizzle rc.4 wraps every query —
+ *  including COMMIT/ROLLBACK — in a `DrizzleQueryError` whose `.cause` is the real pg
+ *  `DatabaseError`, so the SQLSTATE lives one frame down, not on the caught value. */
+function* causeChain(e: unknown): Generator<object> {
+  let cur = e;
+  for (let depth = 0; depth < 8 && typeof cur === 'object' && cur !== null; depth++) {
+    yield cur;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+}
+
+/** A pg DatabaseError is recognised structurally: a 5-char string `.code` with a string
+ *  `.severity`. Searched across the whole cause chain (drizzle wraps it). */
 const sqlStateOf = (e: unknown): string | undefined => {
-  if (typeof e !== 'object' || e === null) return undefined;
-  const { code, severity } = e as { code?: unknown; severity?: unknown };
-  return typeof code === 'string' && code.length === 5 && typeof severity === 'string'
-    ? code
-    : undefined;
+  for (const frame of causeChain(e)) {
+    const { code, severity } = frame as { code?: unknown; severity?: unknown };
+    if (typeof code === 'string' && code.length === 5 && typeof severity === 'string') return code;
+  }
+  return undefined;
 };
 
-/** Socket / code-less teardown — checked BEFORE SQLSTATE so a libuv EPIPE is never read as a SQLSTATE. */
+/** Socket / code-less teardown — checked BEFORE SQLSTATE so a libuv EPIPE is never read as a
+ *  SQLSTATE. Searched across the whole cause chain; the fuzzy "Connection terminated" message
+ *  only counts when no SQLSTATE exists anywhere in the chain. */
 const isSocketLoss = (e: unknown): boolean => {
-  if (typeof e !== 'object' || e === null) return false;
-  const { syscall, code, severity, message } = e as {
-    syscall?: unknown;
-    code?: unknown;
-    severity?: unknown;
-    message?: unknown;
-  };
-  if (typeof syscall === 'string') return true;
-  if (typeof code === 'string' && SOCKET_CODES.has(code) && typeof severity !== 'string') return true;
-  return (
-    typeof message === 'string' &&
-    message.includes('Connection terminated') &&
-    sqlStateOf(e) === undefined
-  );
+  let sawConnTerminated = false;
+  for (const frame of causeChain(e)) {
+    const { syscall, code, severity, message } = frame as {
+      syscall?: unknown;
+      code?: unknown;
+      severity?: unknown;
+      message?: unknown;
+    };
+    if (typeof syscall === 'string') return true;
+    if (typeof code === 'string' && SOCKET_CODES.has(code) && typeof severity !== 'string')
+      return true;
+    if (typeof message === 'string' && message.includes('Connection terminated'))
+      sawConnTerminated = true;
+  }
+  return sawConnTerminated && sqlStateOf(e) === undefined;
 };
 
 /** Pure. Classify a non-RollbackSignal caught value into a structured DrizzleTxError (ADR-0012 §3). */
