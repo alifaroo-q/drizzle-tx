@@ -1,8 +1,8 @@
 import {
+  createDrizzleTx,
   createTransactionalClient,
-  DrizzleAdapter,
   type DrizzleTxCapable,
-  TransactionManager,
+  type TransactionManager,
 } from '@drizzle-tx/core';
 import {
   type DynamicModule,
@@ -63,9 +63,13 @@ export class DrizzleTransactionModule {
       providers: [
         baseDbProvider,
         {
+          // Delegate manager construction to the canonical factory (runs the driver gate;
+          // defaults can't drift). The client is derived from the DRIZZLE_TX_MANAGER token
+          // — the same shape `createDrizzleTx` builds internally — so the testing seam
+          // (`overrideProvider(DRIZZLE_TX_MANAGER)`) still swaps both manager and client.
           provide: DRIZZLE_TX_MANAGER,
           inject: [DRIZZLE_BASE_DB],
-          useFactory: (db: DrizzleTxCapable) => new TransactionManager(new DrizzleAdapter({ db })),
+          useFactory: (db: DrizzleTxCapable) => createDrizzleTx({ drizzle: db }).manager,
         },
         {
           provide: DRIZZLE_TX_CLIENT,

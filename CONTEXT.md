@@ -30,6 +30,10 @@ The framework-agnostic core engine (`@drizzle-tx/core`) — owns the `AsyncLocal
 **Adapter**:
 The ORM seam the manager talks to (`wrapWithTransaction` / `wrapWithNestedTransaction` / `getBaseClient`). The v1 production implementation is the Postgres `DrizzleAdapter` (async-only); a second `NoOpDrizzleAdapter` (from `@drizzle-tx/core/testing`) runs work against a caller-supplied client with no real transaction, and records the boundaries it enters, for tests (ADR-0007).
 
+**Assembly** (`createDrizzleTx`):
+The single non-DI factory that wires a **base client** into a ready-to-use `{ db, withTransaction, begin, isActive, manager }` — the one canonical path every surface (NestJS today, tRPC/Next next) builds on so defaults can't drift. Unlike the fallible runtime surface, assembly **throws at construction** on a fatal misconfiguration (a driver that cannot host an interactive transaction — Neon HTTP); this is a boot-time programmer error, not a modeled runtime condition, so it is exempt from the never-throw rule (ADR-0003).
+_Avoid_: builder, container, factory (bare)
+
 **Transaction host**:
 The NestJS-facing facade — the imperative `withTransaction()` API plus DI wiring; registers itself in a static registry so `@Transactional` can find it at call time.
 
