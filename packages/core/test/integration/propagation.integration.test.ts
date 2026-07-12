@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { accounts, users } from '../../../../test/schema.js';
 import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
@@ -113,3 +114,21 @@ it('pool exhaustion via REQUIRES_NEW FAILS FAST (does not hang)', async () => {
     await small.close();
   }
 }, 10000);
+
+it('R1: ok-returning work still errs when a DEFERRED constraint fails at COMMIT', async () => {
+  // DDL via the raw pool (the proxy is for the query builder; DDL has no builder here).
+  await t.pool.query(`CREATE TABLE IF NOT EXISTS r1_defer (id int PRIMARY KEY, ref int,
+    CONSTRAINT r1_fk FOREIGN KEY (ref) REFERENCES r1_defer(id) DEFERRABLE INITIALLY DEFERRED)`);
+  try {
+    const r = await manager.withTransaction(async () => {
+      await db.execute(sql`INSERT INTO r1_defer (id, ref) VALUES (1, 999)`); // ref 999 absent
+      return ok('inserted'); // work says commit — COMMIT then fails on the deferred FK
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // 23503 foreign_key_violation isn't in a named-variant class → TransactionAborted, sqlState carried:
+    expect(r.error).toMatchObject({ kind: 'TransactionAborted', sqlState: '23503' });
+  } finally {
+    await t.pool.query('DROP TABLE IF EXISTS r1_defer');
+  }
+});
