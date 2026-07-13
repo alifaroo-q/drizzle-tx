@@ -28,7 +28,7 @@ describe('createDrizzleTx', () => {
     const tx = createDrizzleTx({ drizzle: makeFakeDrizzle() });
     expect(typeof tx.withTransaction).toBe('function');
     expect(typeof tx.begin).toBe('function');
-    expect(typeof tx.isActive).toBe('function');
+    expect(typeof tx.isTransactionActive).toBe('function');
     expect(tx.manager).toBeDefined();
     expect(tx.db).toBeDefined();
   });
@@ -37,7 +37,7 @@ describe('createDrizzleTx', () => {
     const tx = createDrizzleTx({ drizzle: makeFakeDrizzle() });
     // biome-ignore lint/suspicious/noExplicitAny: reading the fake's label marker
     expect((tx.db as any).label).toBe('base');
-    expect(tx.isActive()).toBe(false);
+    expect(tx.isTransactionActive()).toBe(false);
   });
 
   it('db auto-joins the active transaction inside withTransaction', async () => {
@@ -55,8 +55,10 @@ describe('createDrizzleTx', () => {
   });
 
   it('bound methods survive destructuring (this-binding preserved)', async () => {
-    const { withTransaction, isActive } = createDrizzleTx({ drizzle: makeFakeDrizzle() });
-    expect(isActive()).toBe(false); // would throw on private-field access if `this` were lost
+    const { withTransaction, isTransactionActive } = createDrizzleTx({
+      drizzle: makeFakeDrizzle(),
+    });
+    expect(isTransactionActive()).toBe(false); // would throw on private-field access if `this` were lost
     await expect(withTransaction(async () => ok('done'))).resolves.toEqual({
       ok: true,
       value: 'done',

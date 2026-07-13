@@ -12,7 +12,7 @@ Core is **already framework-agnostic**. The engine — `TransactionManager.withT
 
 ```
 @drizzle-tx/core           ← ADD createDrizzleTx({ db }) — the non-DI canonical assembly path
-   returns { db, withTransaction, isActive, begin, manager }
+   returns { db, withTransaction, isTransactionActive, begin, manager }
    • collapses the raw `new TransactionManager(new DrizzleAdapter({ db }))` + createTransactionalClient dance
    • the SINGLE assembly path: NestJS module refactors to delegate to it (defaults can't drift)
    • every non-Nest surface (tRPC, Next, future Hono/Fastify/Express) builds on this
@@ -35,7 +35,7 @@ Core is **already framework-agnostic**. The engine — `TransactionManager.withT
 import { createDrizzleTx } from '@drizzle-tx/core';
 import { drizzle } from 'drizzle-orm/node-postgres';
 
-export const { db, withTransaction, begin, isActive, manager } = createDrizzleTx({
+export const { db, withTransaction, begin, isTransactionActive, manager } = createDrizzleTx({
   drizzle: drizzle({ client: pool, relations }),
 });
 // `db` is the transactional client (auto-joins the active tx); import it in repositories.

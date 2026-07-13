@@ -11,8 +11,8 @@ const tx = createDrizzleTx({ drizzle: fakeDrizzle });
 // `db` is typed identically to the base client (repos get full drizzle typing).
 const _dbSelect: 'rows' = tx.db.select();
 
-// `isActive` returns boolean.
-const _active: boolean = tx.isActive();
+// `isTransactionActive` returns boolean.
+const _active: boolean = tx.isTransactionActive();
 
 async function surfaces(): Promise<void> {
   // Overload 1 (work only) must still compile — proves `.bind` did NOT collapse overloads.

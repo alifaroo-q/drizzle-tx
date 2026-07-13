@@ -9,16 +9,19 @@ export interface CreateDrizzleTxOptions<TClient extends DrizzleTxCapable>
   readonly drizzle: TClient;
 }
 
-/** The single canonical assembly result. Types for `withTransaction` / `begin` / `isActive`
- *  are indexed off `TransactionManager` so the 4 `withTransaction` overloads and the
- *  `Result<T, E | DrizzleTxError>` union are preserved through the factory (ADR-0010). */
+/** The single canonical assembly result. Types for `withTransaction` / `begin` /
+ *  `isTransactionActive` are indexed off `TransactionManager` so the 4 `withTransaction`
+ *  overloads and the `Result<T, E | DrizzleTxError>` union are preserved through the
+ *  factory (ADR-0010). */
 export interface DrizzleTx<TClient extends DrizzleTxCapable> {
   /** The transactional client (auto-joins the active tx; else the base client). Import in repositories. */
   readonly db: TClient;
+  /** @remarks The full `TransactionManager` — advanced/adapter-author use (e.g. wrapping in a
+   *  framework adapter). App code uses `db` + `withTransaction`/`begin`, not this. */
   readonly manager: TransactionManager<TClient>;
   readonly withTransaction: TransactionManager<TClient>['withTransaction'];
   readonly begin: TransactionManager<TClient>['begin'];
-  readonly isActive: TransactionManager<TClient>['isTransactionActive'];
+  readonly isTransactionActive: TransactionManager<TClient>['isTransactionActive'];
 }
 
 /** The single non-DI assembly path — every surface (NestJS, tRPC, Next) builds on this so
@@ -50,6 +53,6 @@ export function createDrizzleTx<TClient extends DrizzleTxCapable>(
     // overloaded/generic signatures that `.bind` erases at the type level.
     withTransaction: manager.withTransaction.bind(manager) as DrizzleTx<TClient>['withTransaction'],
     begin: manager.begin.bind(manager),
-    isActive: manager.isTransactionActive.bind(manager),
+    isTransactionActive: manager.isTransactionActive.bind(manager),
   };
 }
