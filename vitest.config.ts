@@ -11,6 +11,15 @@ export default defineConfig({
       include: ['packages/*/src/**'],
       reporter: ['text', 'html'],
       reportsDirectory: './coverage',
+      // Ratchet against regression, not a today-failer: floors a few points below the current
+      // ~97-98% (stmts 97.9 / branch 97.3 / funcs 97.6 / lines 97.7). NOT 100 — the /testing
+      // surfaces and defensive branches keep it under by design (T5, audit-04).
+      thresholds: {
+        statements: 94,
+        branches: 92,
+        functions: 93,
+        lines: 94,
+      },
     },
     projects: [
       {
