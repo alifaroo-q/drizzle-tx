@@ -37,9 +37,12 @@ export type { TransactionWork } from './transaction-manager.js';
 export type { TransactionScope } from './transaction-scope.js';
 
 // ─── Tier B: adapter-author API ───────────────────────────────────────────────
-import type { TransactionManager as _TM } from './transaction-manager.js';
-/** @remarks Adapter-author API. The withTransaction overload contract (incl. REQUIRES_NEW brand). */
-export type WithTransaction<TClient> = _TM<TClient>['withTransaction'];
+// This mid-file `import` intentionally separates the two export-sort groups so Biome keeps the
+// Tier A / Tier B split (a contiguous run of `export … from` statements would be merged + sorted).
+import type { WithTransaction as _WithTransaction } from './transaction-manager.js';
+/** @remarks Adapter-author API. The withTransaction overload contract (incl. REQUIRES_NEW brand).
+ *  Re-aliased from the canonical definition in transaction-manager.ts (single source of truth). */
+export type WithTransaction<TClient> = _WithTransaction<TClient>;
 export { DrizzleAdapter } from './adapters/drizzle.js';
 export type { TransactionAdapter } from './adapters/port.js';
 export {

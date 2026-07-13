@@ -72,21 +72,22 @@ function* causeChain(e: unknown): Generator<object> {
   }
 }
 
-/** A pg DatabaseError is recognised structurally: a 5-char string `.code` with a string
- *  `.severity`. Searched across the whole cause chain (drizzle wraps it). */
-const sqlStateOf = (e: unknown): string | undefined => {
-  for (const frame of causeChain(e)) {
-    const { code, severity } = frame as { code?: unknown; severity?: unknown };
-    if (typeof code === 'string' && code.length === 5 && typeof severity === 'string') return code;
-  }
-  return undefined;
-};
+interface ChainScan {
+  /** First pg SQLSTATE found: a 5-char string `.code` with a string `.severity`. */
+  readonly sqlState: string | undefined;
+  /** Definite socket teardown: a libuv `.syscall`, or a socket `.code` with no pg `.severity`. */
+  readonly socket: boolean;
+  /** The fuzzy "Connection terminated" message — only decisive when no SQLSTATE exists. */
+  readonly connTerminated: boolean;
+}
 
-/** Socket / code-less teardown — checked BEFORE SQLSTATE so a libuv EPIPE is never read as a
- *  SQLSTATE. Searched across the whole cause chain; the fuzzy "Connection terminated" message
- *  only counts when no SQLSTATE exists anywhere in the chain. */
-const isSocketLoss = (e: unknown): boolean => {
-  let sawConnTerminated = false;
+/** ONE walk of the cause chain gathering every marker classification needs, so socket-detection
+ *  and SQLSTATE-extraction are a single traversal rather than two functions each re-walking.
+ *  Socket markers are recognised BEFORE a socket `.code` can be misread as a 5-char SQLSTATE. */
+function scanChain(e: unknown): ChainScan {
+  let sqlState: string | undefined;
+  let socket = false;
+  let connTerminated = false;
   for (const frame of causeChain(e)) {
     const { syscall, code, severity, message } = frame as {
       syscall?: unknown;
@@ -94,14 +95,17 @@ const isSocketLoss = (e: unknown): boolean => {
       severity?: unknown;
       message?: unknown;
     };
-    if (typeof syscall === 'string') return true;
-    if (typeof code === 'string' && SOCKET_CODES.has(code) && typeof severity !== 'string')
-      return true;
+    if (typeof syscall === 'string') socket = true;
+    if (typeof code === 'string') {
+      if (SOCKET_CODES.has(code) && typeof severity !== 'string') socket = true;
+      else if (code.length === 5 && typeof severity === 'string' && sqlState === undefined)
+        sqlState = code;
+    }
     if (typeof message === 'string' && message.includes('Connection terminated'))
-      sawConnTerminated = true;
+      connTerminated = true;
   }
-  return sawConnTerminated && sqlStateOf(e) === undefined;
-};
+  return { sqlState, socket, connTerminated };
+}
 
 /** Pure. Classify a non-RollbackSignal caught value into a structured DrizzleTxError (ADR-0012 §3). */
 export function classifyCaught(e: unknown, lostDomainError?: unknown): DrizzleTxError {
@@ -110,8 +114,10 @@ export function classifyCaught(e: unknown, lostDomainError?: unknown): DrizzleTx
     cause: e,
     ...(lostDomainError !== undefined ? { lostDomainError } : {}),
   };
-  if (isSocketLoss(e)) return connectionLost({ ...base, sqlState: undefined });
-  const sqlState = sqlStateOf(e);
+  const { sqlState, socket, connTerminated } = scanChain(e);
+  // Socket / code-less teardown wins over SQLSTATE; the fuzzy message only counts with no SQLSTATE.
+  if (socket || (connTerminated && sqlState === undefined))
+    return connectionLost({ ...base, sqlState: undefined });
   if (sqlState === '40001') return serializationFailure({ ...base, sqlState });
   if (sqlState === '40P01') return deadlockDetected({ ...base, sqlState });
   if (sqlState !== undefined && CONN_LOST_SQLSTATE.has(sqlState))

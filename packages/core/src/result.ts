@@ -33,8 +33,9 @@ export type Independent<T, E> = Result<T, E> & { readonly [IND]: true };
 export type NonIndependent<T, E> = Result<T, E> & { readonly [IND]?: never };
 
 /** Unwrap an `Independent` to a plain `Result` (runtime: identity, ZERO cost). Returning this at
- *  the outer boundary is the conscious opt-in that "inner err → outer rollback". */
-export const settle = <T, E>(i: Independent<T, E>): Result<T, E> => i as Result<T, E>;
+ *  the outer boundary is the conscious opt-in that "inner err → outer rollback". The return-type
+ *  annotation alone strips the brand — `Independent<T,E>` already IS a `Result<T,E>`, no cast. */
+export const settle = <T, E>(i: Independent<T, E>): Result<T, E> => i;
 
 export function assertNever(x: never, message = 'Unhandled variant'): never {
   throw new Error(`${message}: ${JSON.stringify(x)}`);

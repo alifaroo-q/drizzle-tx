@@ -1,6 +1,10 @@
 import { DrizzleAdapter, type DrizzleTxCapable } from './adapters/drizzle.js';
 import { rejectUnsupportedDriver } from './driver-capability.js';
-import { TransactionManager, type TransactionManagerOptions } from './transaction-manager.js';
+import {
+  TransactionManager,
+  type TransactionManagerOptions,
+  type WithTransaction,
+} from './transaction-manager.js';
 import { createTransactionalClient } from './transactional-client.js';
 
 export interface CreateDrizzleTxOptions<TClient extends DrizzleTxCapable>
@@ -10,16 +14,16 @@ export interface CreateDrizzleTxOptions<TClient extends DrizzleTxCapable>
 }
 
 /** The single canonical assembly result. Types for `withTransaction` / `begin` /
- *  `isTransactionActive` are indexed off `TransactionManager` so the 4 `withTransaction`
- *  overloads and the `Result<T, E | DrizzleTxError>` union are preserved through the
- *  factory (ADR-0010). */
+ *  `isTransactionActive` are derived from `TransactionManager` so the six `withTransaction`
+ *  overloads (2 REQUIRES_NEW `Independent` + 4 plain `Result`) and the `Result<T, E | DrizzleTxError>`
+ *  union are preserved through the factory (ADR-0010). */
 export interface DrizzleTx<TClient extends DrizzleTxCapable> {
   /** The transactional client (auto-joins the active tx; else the base client). Import in repositories. */
   readonly db: TClient;
   /** @remarks The full `TransactionManager` — advanced/adapter-author use (e.g. wrapping in a
    *  framework adapter). App code uses `db` + `withTransaction`/`begin`, not this. */
   readonly manager: TransactionManager<TClient>;
-  readonly withTransaction: TransactionManager<TClient>['withTransaction'];
+  readonly withTransaction: WithTransaction<TClient>;
   readonly begin: TransactionManager<TClient>['begin'];
   readonly isTransactionActive: TransactionManager<TClient>['isTransactionActive'];
 }
@@ -49,9 +53,9 @@ export function createDrizzleTx<TClient extends DrizzleTxCapable>(
   return {
     db,
     manager,
-    // Runtime `.bind` preserves `this`; the interface's indexed-access types restore the
-    // overloaded/generic signatures that `.bind` erases at the type level.
-    withTransaction: manager.withTransaction.bind(manager) as DrizzleTx<TClient>['withTransaction'],
+    // `.bind` preserves `this`; the field's `WithTransaction<TClient>` annotation restores the
+    // overloaded/generic signature (no cast — the bound method is assignable to it directly).
+    withTransaction: manager.withTransaction.bind(manager),
     begin: manager.begin.bind(manager),
     isTransactionActive: manager.isTransactionActive.bind(manager),
   };

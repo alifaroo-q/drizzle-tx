@@ -11,6 +11,11 @@ import { openScope, type TransactionScope } from './transaction-scope.js';
 
 export type { TransactionWork } from './propagation-plan.js';
 
+/** The `withTransaction` overload contract (incl. the REQUIRES_NEW `Independent` brand), derived
+ *  from the manager so it can't drift. The single type every assembly site (core factory, NestJS
+ *  host) binds `withTransaction` to. */
+export type WithTransaction<TClient> = TransactionManager<TClient>['withTransaction'];
+
 export interface TransactionManagerOptions {
   readonly logger?: TxLogger;
   /** Default `disposeTimeoutMs` for every `begin()` scope (per-call `begin({ disposeTimeoutMs })`
@@ -109,9 +114,12 @@ export class TransactionManager<TClient> {
    *  ```
    */
   begin(options?: BeginOptions): Promise<Result<TransactionScope<TClient>, DrizzleTxError>> {
-    const disposeTimeoutMs = options?.disposeTimeoutMs ?? this.#disposeTimeoutMs;
+    // Split the scope-lifecycle control from the SQL tx options: `disposeTimeoutMs` drives the
+    // leak backstop and must NOT ride into the adapter's `BEGIN` config object.
+    const { disposeTimeoutMs: perCall, ...txOptions } = options ?? {};
+    const disposeTimeoutMs = perCall ?? this.#disposeTimeoutMs;
     return openScope<TClient>(
-      (work) => this.#newTransaction<void, symbol>(options, work),
+      (work) => this.#newTransaction<void, symbol>(txOptions, work),
       () => this.getTransactionClient(),
       this.#logger,
       disposeTimeoutMs,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PoolTimeoutError } from '../../src/adapters/drizzle.js';
 import { err, ok } from '../../src/result.js';
 import { classifyRollback, RollbackSignal, toThrowable } from '../../src/rollback-boundary.js';
 
@@ -33,6 +34,16 @@ describe('classifyRollback', () => {
     expect(classifyRollback(new PoolTimeoutError())).toEqual({
       ok: false,
       error: { kind: 'PoolConnectionTimeout', timeoutMs: 250 },
+    });
+  });
+
+  it('maps the REAL adapter PoolTimeoutError, carrying its timeoutMs (binds the name coupling)', () => {
+    // Round-trips the actual class the adapter throws — not a local look-alike — so renaming
+    // `PoolTimeoutError` in adapters/drizzle.ts breaks the constructor-name match HERE (this
+    // suite goes red) instead of silently reclassifying pool timeouts as TransactionAborted.
+    expect(classifyRollback(new PoolTimeoutError(3000))).toEqual({
+      ok: false,
+      error: { kind: 'PoolConnectionTimeout', timeoutMs: 3000 },
     });
   });
 
