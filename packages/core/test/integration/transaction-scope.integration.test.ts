@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { users } from '../../../../test/schema.js';
 import { createTestDb, type TestDb } from '../../../../vitest.dbPerWorker.js';
 import { DrizzleAdapter } from '../../src/adapters/drizzle.js';
+import { ok } from '../../src/result.js';
 import { TransactionManager } from '../../src/transaction-manager.js';
 
 let t: TestDb;
@@ -73,3 +74,22 @@ it('the scope commit is visible on a separate connection', async () => {
   const seen = await t.pool.query('SELECT name FROM users WHERE name = $1', ['CrossConn']);
   expect(seen.rowCount).toBe(1);
 });
+
+it('R5: an un-disposed scope is reclaimed after disposeTimeoutMs (connection released)', async () => {
+  const small = await createTestDb(1); // pool max 1 → the scope holds the ONLY connection
+  const m = new TransactionManager(new DrizzleAdapter({ db: small.db }), {
+    logger: { warn: () => {} },
+  });
+  try {
+    const opened = await m.begin({ disposeTimeoutMs: 500 });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    // Deliberately DO NOT dispose — simulate a forgotten scope pinning the connection.
+    // The backstop (500ms) fires < the pool's 3s connectionTimeout, freeing the connection so a
+    // fresh tx can acquire it instead of deadlocking:
+    const r = await m.withTransaction(async () => ok('reclaimed'));
+    expect(r).toEqual({ ok: true, value: 'reclaimed' });
+  } finally {
+    await small.close();
+  }
+}, 10000);

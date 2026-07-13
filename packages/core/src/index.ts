@@ -15,7 +15,7 @@ export {
 } from './errors.js';
 export { consoleLogger, noopLogger, type TxLogger } from './logger.js';
 // (TxFailureFields is exported in Tier B — it's the factories' parameter type.)
-export type { AccessMode, IsolationLevel, TxOptions } from './options.js';
+export type { AccessMode, BeginOptions, IsolationLevel, TxOptions } from './options.js';
 export { Propagation } from './propagation.js';
 export {
   andThen,

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NoOpDrizzleAdapter } from '../../src/adapters/noop.js';
 import type { TransactionAdapter } from '../../src/adapters/port.js';
 import { Propagation } from '../../src/propagation.js';
@@ -390,5 +390,44 @@ describe('TransactionManager.begin (scope-based / AsyncDisposable)', () => {
     const opened = await m.begin();
     expect(opened.ok).toBe(false);
     if (!opened.ok) expect(opened.error.kind).toBe('TransactionAborted');
+  });
+});
+
+describe('TransactionManager.begin — disposeTimeoutMs resolution (R5, ADR-0014)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('begin() uses the manager-default disposeTimeoutMs; a per-call value overrides it', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const m = new TransactionManager<{}>(new NoOpDrizzleAdapter({}, { quiet: true }), {
+      logger: { warn },
+      disposeTimeoutMs: 1000,
+    });
+
+    const opened = await m.begin(); // inherits the manager default (1000)
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('1000ms'));
+
+    warn.mockClear();
+    const opened2 = await m.begin({ disposeTimeoutMs: 200 }); // per-call overrides the default
+    if (!opened2.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('200ms'));
+  });
+
+  it('begin() with no manager default and no per-call value arms no backstop', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const m = new TransactionManager<{}>(new NoOpDrizzleAdapter({}, { quiet: true }), {
+      logger: { warn },
+    });
+    const opened = await m.begin();
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1_000_000);
+    expect(warn).not.toHaveBeenCalled();
+    await opened.value[Symbol.asyncDispose]();
   });
 });

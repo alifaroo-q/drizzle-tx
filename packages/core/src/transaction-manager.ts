@@ -1,7 +1,7 @@
 import type { TransactionAdapter } from './adapters/port.js';
 import type { DrizzleTxError } from './errors.js';
 import { consoleLogger, type TxLogger } from './logger.js';
-import type { TxOptions } from './options.js';
+import type { BeginOptions, TxOptions } from './options.js';
 import type { Propagation } from './propagation.js';
 import { normalizeArgs, planTransaction, type TransactionWork } from './propagation-plan.js';
 import { err, type Independent, ok, type Result } from './result.js';
@@ -13,16 +13,21 @@ export type { TransactionWork } from './propagation-plan.js';
 
 export interface TransactionManagerOptions {
   readonly logger?: TxLogger;
+  /** Default `disposeTimeoutMs` for every `begin()` scope (per-call `begin({ disposeTimeoutMs })`
+   *  overrides). Default OFF. See ADR-0014 R5. */
+  readonly disposeTimeoutMs?: number;
 }
 
 export class TransactionManager<TClient> {
   readonly #ctx = new TransactionContext<TClient>();
   readonly #adapter: TransactionAdapter<TClient>;
   readonly #logger: TxLogger;
+  readonly #disposeTimeoutMs: number | undefined;
 
   constructor(adapter: TransactionAdapter<TClient>, options?: TransactionManagerOptions) {
     this.#adapter = adapter;
     this.#logger = options?.logger ?? consoleLogger;
+    this.#disposeTimeoutMs = options?.disposeTimeoutMs;
   }
 
   getTransactionClient(): TClient {
@@ -96,11 +101,13 @@ export class TransactionManager<TClient> {
    *  scope.commit();                           // omit → rollback on scope exit
    *  ```
    */
-  begin(options?: TxOptions): Promise<Result<TransactionScope<TClient>, DrizzleTxError>> {
+  begin(options?: BeginOptions): Promise<Result<TransactionScope<TClient>, DrizzleTxError>> {
+    const disposeTimeoutMs = options?.disposeTimeoutMs ?? this.#disposeTimeoutMs;
     return openScope<TClient>(
       (work) => this.#newTransaction<void, symbol>(options, work),
       () => this.getTransactionClient(),
       this.#logger,
+      disposeTimeoutMs,
     );
   }
 

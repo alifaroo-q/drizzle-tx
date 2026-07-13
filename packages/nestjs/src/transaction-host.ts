@@ -1,9 +1,9 @@
 import type {
+  BeginOptions,
   DrizzleTxError,
   Result,
   TransactionManager,
   TransactionScope,
-  TxOptions,
   WithTransaction,
 } from '@drizzle-tx/core';
 import { Inject, Injectable } from '@nestjs/common';
@@ -44,7 +44,7 @@ export class TransactionHost {
    *  Rolls back on dispose unless `commit()` is called; returns `err(...)` (never throws)
    *  if the transaction cannot start. NOTE: a scope does not set the ALS context, so the
    *  injected `DRIZZLE_TX_CLIENT` proxy will not auto-join it — use `scope.tx` explicitly. */
-  begin(options?: TxOptions): Promise<Result<TransactionScope<unknown>, DrizzleTxError>> {
+  begin(options?: BeginOptions): Promise<Result<TransactionScope<unknown>, DrizzleTxError>> {
     return this.#manager.begin(options);
   }
 }
