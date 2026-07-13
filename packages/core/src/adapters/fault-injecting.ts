@@ -44,8 +44,21 @@ export interface FaultInjection {
 export interface FaultInjectingDrizzleAdapterOptions {
   readonly logger?: TxLogger;
   readonly quiet?: boolean;
-  readonly failAt?: Partial<Record<TxPhase, unknown | FaultInjection>>;
+  /** Phases to fail from construction. Each value is either a bare error (thrown forever) or a
+   *  {@link FaultInjection} `{ error, times }` config. Typed `unknown` because a bare error is
+   *  unknown-shaped — a config is recognised structurally by its `error` key (see `isInjection`).
+   *  The fluent {@link FaultInjectingDrizzleAdapter.failOn}/`failOnce` setters take the error
+   *  directly and never do this structural disambiguation. */
+  readonly failAt?: Partial<Record<TxPhase, unknown>>;
 }
+
+const PHASES = {
+  'new-root': { pre: 'begin', post: 'commit', undo: 'rollback' },
+  nested: { pre: 'savepoint', post: 'release-savepoint', undo: 'rollback-to-savepoint' },
+} as const satisfies Record<
+  FaultBoundaryLogEntry['kind'],
+  { pre: TxPhase; post: TxPhase; undo: TxPhase }
+>;
 
 export interface FaultBoundaryLogEntry {
   readonly kind: 'new-root' | 'nested';
@@ -86,11 +99,13 @@ export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter
   }
 
   failOn(phase: TxPhase, error: unknown): this {
-    this.#arm(phase, error);
+    // Direct-arm: the error IS the thrown value — no structural `isInjection` disambiguation, so
+    // an error object that happens to carry an `.error`/`.times` key is thrown as-is.
+    this.#armed.set(phase, { error, remaining: Number.POSITIVE_INFINITY });
     return this;
   }
   failOnce(phase: TxPhase, error: unknown): this {
-    this.#arm(phase, { error, times: 1 });
+    this.#armed.set(phase, { error, remaining: 1 });
     return this;
   }
   clear(phase?: TxPhase): this {
@@ -100,20 +115,16 @@ export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter
   }
 
   wrapWithTransaction<T>(_o: TxOptions | undefined, work: (tx: TClient) => Promise<T>): Promise<T> {
-    return this.#boundary('new-root', 'begin', 'commit', 'rollback', work);
+    return this.#boundary('new-root', work);
   }
   wrapWithNestedTransaction<T>(_p: TClient, work: (sp: TClient) => Promise<T>): Promise<T> {
-    return this.#boundary(
-      'nested',
-      'savepoint',
-      'release-savepoint',
-      'rollback-to-savepoint',
-      work,
-    );
+    return this.#boundary('nested', work);
   }
 
-  #arm(phase: TxPhase, v: unknown | FaultInjection): void {
-    const inj = isInjection(v) ? v : { error: v, times: Number.POSITIVE_INFINITY };
+  /** Constructor-map arming only: a `failAt` value is a bare error unless it structurally looks
+   *  like a {@link FaultInjection} (`isInjection`). The fluent setters bypass this entirely. */
+  #arm(phase: TxPhase, v: unknown): void {
+    const inj = isInjection(v) ? v : { error: v };
     this.#armed.set(phase, { error: inj.error, remaining: inj.times ?? Number.POSITIVE_INFINITY });
   }
 
@@ -128,11 +139,9 @@ export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter
 
   async #boundary<T>(
     kind: FaultBoundaryLogEntry['kind'],
-    pre: TxPhase,
-    post: TxPhase,
-    undo: TxPhase,
     work: (c: TClient) => Promise<T>,
   ): Promise<T> {
+    const { pre, post, undo } = PHASES[kind];
     // PRE (BEGIN / SAVEPOINT) — before work; a fault here means work never runs.
     const preErr = this.#take(pre);
     if (preErr !== undefined) {

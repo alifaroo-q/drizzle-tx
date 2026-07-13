@@ -163,4 +163,35 @@ describe('openScope — disposeTimeoutMs leak backstop', () => {
     expect(warn).not.toHaveBeenCalled();
     await opened.value[Symbol.asyncDispose]();
   });
+
+  it.each([
+    0, -1,
+  ])('a non-positive disposeTimeoutMs (%s) is treated as OFF — never rolls back live work', async (timeout) => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const run: Runner = async (work) => work();
+    const opened = await openScope(run, captureClient, { warn }, timeout);
+    if (!opened.ok) throw new Error('expected ok');
+    opened.value.commit();
+    await vi.advanceTimersByTimeAsync(1_000_000); // no immediate/eventual forced rollback
+    expect(warn).not.toHaveBeenCalled();
+    await opened.value[Symbol.asyncDispose]();
+  });
+
+  it('backstop that fires after the tx self-terminated does not warn (nothing to reclaim)', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    // The tx starts (work captures the client) but then ends on its own — connection drop — before
+    // dispose: the runner abandons the parked work and settles early. When the timer later elapses
+    // there is nothing left to reclaim, so it must stay silent.
+    const run: Runner = async (work) => {
+      void work(); // captures the client + parks on the gate; NOT awaited
+      return err(Symbol('conn-dropped')); // transaction dies on its own
+    };
+    const opened = await openScope(run, captureClient, { warn }, 1000);
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(warn).not.toHaveBeenCalled(); // the "not disposed" warning would be misleading here
+    await opened.value[Symbol.asyncDispose]();
+  });
 });

@@ -143,6 +143,20 @@ describe('FaultInjectingDrizzleAdapter — new-root', () => {
     const r = await mgr(a).withTransaction(async () => ok('x'));
     expect(r).toEqual({ ok: true, value: 'x' });
   });
+
+  it('failOn throws the error AS-IS even when it structurally looks like a FaultInjection', async () => {
+    // Regression: the fluent setters must NOT route through the `{ error, times }` structural
+    // probe. An error object carrying an `.error` key is the thrown value, not a config whose
+    // inner `.error` gets unwrapped.
+    const wrapped = Object.assign(new Error('aggregate'), { error: 'INNER', times: 99 });
+    const a = new FaultInjectingDrizzleAdapter({}, { quiet: true }).failOn('commit', wrapped);
+    const r = await mgr(a).withTransaction(async () => ok('x'));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // The whole wrapped error is classified as the cause — NOT the inner 'INNER' string, and the
+    // `times: 99` is ignored (a single failOn is sticky, so the phase stays armed).
+    expect((r.error as { cause: unknown }).cause).toBe(wrapped);
+  });
 });
 
 describe('FaultInjectingDrizzleAdapter — R2 shadowing + nested', () => {

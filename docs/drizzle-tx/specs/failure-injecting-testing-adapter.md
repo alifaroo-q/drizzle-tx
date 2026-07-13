@@ -43,8 +43,10 @@ export interface FaultInjection {
 export interface FaultInjectingDrizzleAdapterOptions {
   readonly logger?: TxLogger;
   readonly quiet?: boolean;
-  /** Phases to fail from construction. Value may be a bare error (sticky) or a FaultInjection. */
-  readonly failAt?: Partial<Record<TxPhase, unknown | FaultInjection>>;
+  /** Phases to fail from construction. Each value is a bare error (sticky) or a FaultInjection —
+   *  a config is recognised structurally by its `error` key. Typed `unknown` (a bare error is
+   *  unknown-shaped); `unknown | FaultInjection` would collapse to `unknown` and mislead. */
+  readonly failAt?: Partial<Record<TxPhase, unknown>>;
 }
 
 export class FaultInjectingDrizzleAdapter<TClient> implements TransactionAdapter<TClient> {

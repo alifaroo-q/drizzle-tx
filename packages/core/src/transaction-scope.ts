@@ -70,6 +70,15 @@ export async function openScope<TClient>(
 
   let backstop: ReturnType<typeof setTimeout> | undefined;
 
+  // Track self-termination: if the transaction ends on its own (e.g. the connection drops) before
+  // the caller disposes, `settled` resolves early — the backstop must NOT then warn about a
+  // "forgotten" scope, because there is nothing left to reclaim.
+  let hasSettled = false;
+  const markSettled = () => {
+    hasSettled = true;
+  };
+  settled.then(markSettled, markSettled);
+
   const scope: TransactionScope<TClient> = {
     tx: capturedClient,
     commit: () => {
@@ -93,8 +102,12 @@ export async function openScope<TClient>(
 
   // R5 backstop (ADR-0014): opt-in, default OFF. On fire, do what a forgotten dispose would —
   // force default-deny rollback + release the connection + warn loudly. Never throws.
-  if (disposeTimeoutMs !== undefined && Number.isFinite(disposeTimeoutMs)) {
+  // Strictly positive only: a non-positive `disposeTimeoutMs` is treated as OFF (matching the
+  // unset / non-finite framing) — `0`/negative would otherwise arm an immediate rollback that
+  // reclaims still-live work, the opposite of the "forgotten scope" contract.
+  if (disposeTimeoutMs !== undefined && Number.isFinite(disposeTimeoutMs) && disposeTimeoutMs > 0) {
     backstop = setTimeout(() => {
+      if (hasSettled) return; // transaction already ended on its own — nothing to reclaim
       outcome = 'rollback'; // override any prior commit() — leak reclaim
       releaseGate(); // settles the parked work → adapter ROLLBACK + release
       logger.warn(
