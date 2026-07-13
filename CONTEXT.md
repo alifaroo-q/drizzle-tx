@@ -50,7 +50,7 @@ _Avoid_: calling the scope a "manual transaction" — it is the **scope primitiv
 ### Errors
 
 **`DrizzleTxError`**:
-The library's exhaustive discriminated union of *infrastructure* failures (`PoolConnectionTimeout`, `TransactionAborted`, `HostNotInitialized`, `NotPoolBacked`). A consumer's own domain error `E` is never folded into this union — it is returned faithfully.
+The library's exhaustive discriminated union of *infrastructure* failures (ADR-0012). Two groups: **assembly/pool** variants with no structured triad (`PoolConnectionTimeout`, `HostNotInitialized`, `NotPoolBacked`), and **transaction-body** variants that all carry `TxFailureFields` (`message`/`sqlState`/`cause`, plus `lostDomainError` on a rollback double-fault): `SerializationFailure`, `DeadlockDetected`, `ConnectionLost`, `TransactionAborted`. A consumer's own domain error `E` is never folded into this union — it is returned faithfully.
 _Avoid_: mixing domain errors into `DrizzleTxError`
 
 ## Relationships
