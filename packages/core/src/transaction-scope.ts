@@ -30,6 +30,7 @@ export async function openScope<TClient>(
   ) => Promise<Result<void, symbol | DrizzleTxError>>,
   captureClient: () => TClient,
   logger: TxLogger,
+  disposeTimeoutMs?: number,
 ): Promise<Result<TransactionScope<TClient>, DrizzleTxError>> {
   let outcome: 'commit' | 'rollback' = 'rollback'; // default-deny
   let releaseGate!: () => void;
@@ -67,6 +68,8 @@ export async function openScope<TClient>(
       : err(early.error as DrizzleTxError);
   }
 
+  let backstop: ReturnType<typeof setTimeout> | undefined;
+
   const scope: TransactionScope<TClient> = {
     tx: capturedClient,
     commit: () => {
@@ -76,6 +79,7 @@ export async function openScope<TClient>(
       outcome = 'rollback';
     },
     [Symbol.asyncDispose]: async () => {
+      if (backstop !== undefined) clearTimeout(backstop); // normal dispose disarms the backstop
       releaseGate();
       const result = await settled;
       // Disposal never throws (no-throw model). A genuine commit/rollback failure (not the
@@ -86,5 +90,21 @@ export async function openScope<TClient>(
       }
     },
   };
+
+  // R5 backstop (ADR-0014): opt-in, default OFF. On fire, do what a forgotten dispose would —
+  // force default-deny rollback + release the connection + warn loudly. Never throws.
+  if (disposeTimeoutMs !== undefined && Number.isFinite(disposeTimeoutMs)) {
+    backstop = setTimeout(() => {
+      outcome = 'rollback'; // override any prior commit() — leak reclaim
+      releaseGate(); // settles the parked work → adapter ROLLBACK + release
+      logger.warn(
+        `transaction scope not disposed within ${disposeTimeoutMs}ms — forced rollback; ` +
+          'use `await using` to guarantee disposal (this backstop reclaims a forgotten connection, ' +
+          'it is not a work deadline).',
+      );
+    }, disposeTimeoutMs);
+    backstop.unref?.(); // never keep the event loop alive for the backstop
+  }
+
   return ok(scope);
 }

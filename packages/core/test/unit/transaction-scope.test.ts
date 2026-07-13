@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transactionAborted } from '../../src/errors.js';
 import { err, ok, type Result } from '../../src/result.js';
 import { openScope } from '../../src/transaction-scope.js';
@@ -90,5 +90,77 @@ describe('openScope', () => {
       expect(opened.error.kind).toBe('TransactionAborted');
       expect(String(opened.error.cause)).toContain('closed before it started');
     }
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('openScope — disposeTimeoutMs leak backstop', () => {
+  it('OFF by default: no timer armed when disposeTimeoutMs is undefined', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const run: Runner = async (work) => work();
+    const opened = await openScope(run, captureClient, { warn }); // no 4th arg
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1_000_000);
+    expect(warn).not.toHaveBeenCalled(); // zero behavior change
+    await opened.value[Symbol.asyncDispose](); // clean up the parked work
+  });
+
+  it('fires on elapse: forces rollback, releases the gate, warns loudly', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    let settled: Result<void, symbol> | undefined;
+    // NOTE: this fake Runner captures the work's return directly (not routed through the manager's
+    // #runInBoundary), so `settled` is the raw rollback sentinel — assert only `.ok === false` here.
+    const run: Runner = async (work) => {
+      const r = await work();
+      settled = r;
+      return r;
+    };
+    const opened = await openScope(run, captureClient, { warn }, 1000);
+    if (!opened.ok) throw new Error('expected ok');
+    opened.value.commit(); // even a prior commit() is overridden by the backstop
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('not disposed within 1000ms'));
+    expect(settled?.ok).toBe(false); // forced default-deny rollback (sentinel), not commit
+  });
+
+  it('normal dispose before elapse clears the timer (no spurious warn)', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const run: Runner = async (work) => work();
+    const opened = await openScope(run, captureClient, { warn }, 1000);
+    if (!opened.ok) throw new Error('expected ok');
+    opened.value.commit();
+    await opened.value[Symbol.asyncDispose]();
+    await vi.advanceTimersByTimeAsync(5000); // long past the timeout
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('late dispose after the backstop fired is idempotent (no throw, no second warn)', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const run: Runner = async (work) => work();
+    const opened = await openScope(run, captureClient, { warn }, 1000);
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(warn).toHaveBeenCalledTimes(1);
+    await expect(opened.value[Symbol.asyncDispose]()).resolves.toBeUndefined(); // no throw
+    expect(warn).toHaveBeenCalledTimes(1); // no second warn (already settled via sentinel)
+  });
+
+  it('a non-finite disposeTimeoutMs (Infinity) arms no timer', async () => {
+    vi.useFakeTimers();
+    const warn = vi.fn();
+    const run: Runner = async (work) => work();
+    const opened = await openScope(run, captureClient, { warn }, Number.POSITIVE_INFINITY);
+    if (!opened.ok) throw new Error('expected ok');
+    await vi.advanceTimersByTimeAsync(1_000_000);
+    expect(warn).not.toHaveBeenCalled();
+    await opened.value[Symbol.asyncDispose]();
   });
 });
