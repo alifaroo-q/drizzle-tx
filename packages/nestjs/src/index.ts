@@ -1,6 +1,7 @@
 export type {
   DrizzleTxError,
   DrizzleTxErrorKind,
+  Independent,
   Result,
   TransactionScope,
   TransactionWork,
@@ -9,7 +10,6 @@ export type {
 // Re-export the Result/propagation surface so consumers import from one place.
 export {
   andThen,
-  assertNever,
   err,
   isErr,
   isOk,
@@ -19,6 +19,7 @@ export {
   matchError,
   ok,
   Propagation,
+  settle,
   unwrapOr,
 } from '@drizzle-tx/core';
 export type {
