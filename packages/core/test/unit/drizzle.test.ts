@@ -138,4 +138,36 @@ describe('DrizzleAdapter', () => {
       expect(configs).toEqual([undefined]); // isolation is fixed by the outer tx
     });
   });
+
+  describe('PoolConnectionTimeout carries the configured timeout (R4)', () => {
+    it('a pool-connect timeout carries the configured connectionTimeoutMillis (R4)', async () => {
+      const fakeDb = {
+        $client: { totalCount: 1, idleCount: 0, options: { connectionTimeoutMillis: 3000 } },
+        transaction: async () => {
+          throw new Error('timeout exceeded when trying to connect');
+        },
+      } as unknown as DrizzleTxCapable;
+
+      const adapter = new DrizzleAdapter({ db: fakeDb });
+      // (uses the imported PoolTimeoutError so the import isn't dead — assert the type AND the value)
+      await expect(adapter.wrapWithTransaction(undefined, async () => 'x')).rejects.toBeInstanceOf(
+        PoolTimeoutError,
+      );
+      await expect(adapter.wrapWithTransaction(undefined, async () => 'x')).rejects.toMatchObject({
+        timeoutMs: 3000, // carries the CONFIGURED timeout, not the hard-coded undefined
+      });
+    });
+
+    it('reports undefined when no finite connectionTimeoutMillis is configured', async () => {
+      const fakeDb = {
+        $client: { totalCount: 1, idleCount: 0, options: {} }, // pg default: wait forever
+        transaction: async () => {
+          throw new Error('timeout exceeded when trying to connect');
+        },
+      } as unknown as DrizzleTxCapable;
+      await expect(
+        new DrizzleAdapter({ db: fakeDb }).wrapWithTransaction(undefined, async () => 'x'),
+      ).rejects.toMatchObject({ timeoutMs: undefined });
+    });
+  });
 });

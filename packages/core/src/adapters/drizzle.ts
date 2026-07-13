@@ -41,14 +41,24 @@ function isPoolBacked(client: unknown): boolean {
   );
 }
 
+/** The configured pg pool connect timeout, read structurally (no pg import). `0`/absent means
+ *  "wait forever" (pg default) → no finite timeout to report. */
+function poolConnectTimeoutMs(client: unknown): number | undefined {
+  const ms = (client as { options?: { connectionTimeoutMillis?: unknown } })?.options
+    ?.connectionTimeoutMillis;
+  return typeof ms === 'number' && ms > 0 ? ms : undefined;
+}
+
 export class DrizzleAdapter<TClient extends DrizzleTxCapable>
   implements TransactionAdapter<TClient>
 {
   readonly #db: TClient;
+  readonly #connectTimeoutMs: number | undefined;
   readonly supportsIndependentTransactions: boolean;
 
   constructor(config: DrizzleAdapterConfig<TClient>) {
     this.#db = config.db;
+    this.#connectTimeoutMs = poolConnectTimeoutMs(config.db.$client);
     this.supportsIndependentTransactions = isPoolBacked(config.db.$client);
   }
 
@@ -64,7 +74,7 @@ export class DrizzleAdapter<TClient extends DrizzleTxCapable>
       .transaction(async (tx) => work(tx), options)
       .catch((e: unknown) => {
         if (e instanceof Error && /timeout exceeded when trying to connect/i.test(e.message)) {
-          throw new PoolTimeoutError(undefined);
+          throw new PoolTimeoutError(this.#connectTimeoutMs);
         }
         throw e;
       });
