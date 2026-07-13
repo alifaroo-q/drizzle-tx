@@ -1,6 +1,6 @@
 {
   "name": "@drizzle-tx/nestjs",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "commonjs",
   "license": "MIT",
   "repository": {
