@@ -1,14 +1,15 @@
 import { type DrizzleTxError, notPoolBacked } from './errors.js';
 import type { TxOptions } from './options.js';
 import { Propagation } from './propagation.js';
-import { assertNever, type Result } from './result.js';
+import { assertNever, type NonIndependent } from './result.js';
 
 /** A unit of transactional work: an async function returning an explicit `Result`.
  *  Returning `err(...)` triggers a rollback (ADR-0003). Defined here — alongside
  *  `normalizeArgs`, which shapes the call — so the pure planning module owns the full
  *  description of a transactional call (propagation + options + work) with no back-edge
- *  to the imperative manager. */
-export type TransactionWork<T, E> = () => Promise<Result<T, E>>;
+ *  to the imperative manager. The return is poisoned so a branded REQUIRES_NEW
+ *  `Independent` can't be returned as work output — see result.ts `NonIndependent`. */
+export type TransactionWork<T, E> = () => Promise<NonIndependent<T, E>>;
 
 /** A plain-data description of what a withTransaction call should do. The pure core
  *  produces this; the imperative shell interprets it. */

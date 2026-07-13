@@ -20,6 +20,22 @@ export const err = <E>(error: E): Result<never, E> => ({ ok: false, error });
 export const isOk = <T, E>(r: Result<T, E>): r is Ok<T> => r.ok;
 export const isErr = <T, E>(r: Result<T, E>): r is Err<E> => !r.ok;
 
+declare const IND: unique symbol;
+
+/** A REQUIRES_NEW outcome that already settled on its OWN connection. Inspect it directly
+ *  (`.ok`/`.value`/`.error`); it CANNOT be `return`ed as an outer Result by accident —
+ *  `settle()` it consciously to propagate its outcome to the outer transaction. Zero runtime cost. */
+export type Independent<T, E> = Result<T, E> & { readonly [IND]: true };
+
+/** The transactional-work return poison: a Result that must NOT be a branded `Independent`
+ *  (`true ⊄ never`). A plain Result satisfies it (the optional phantom is absent); an
+ *  `Independent` does not — so `return inner` for a REQUIRES_NEW outcome fails to compile. */
+export type NonIndependent<T, E> = Result<T, E> & { readonly [IND]?: never };
+
+/** Unwrap an `Independent` to a plain `Result` (runtime: identity, ZERO cost). Returning this at
+ *  the outer boundary is the conscious opt-in that "inner err → outer rollback". */
+export const settle = <T, E>(i: Independent<T, E>): Result<T, E> => i as Result<T, E>;
+
 export function assertNever(x: never, message = 'Unhandled variant'): never {
   throw new Error(`${message}: ${JSON.stringify(x)}`);
 }
