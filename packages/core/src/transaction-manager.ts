@@ -38,10 +38,20 @@ export class TransactionManager<TClient> {
    *  failure at commit surfaces as the classified variant (e.g. SerializationFailure at commit). */
   // Overloads mirror the imperative API. REQUIRES_NEW literals come FIRST so a literal
   // argument resolves to the branded overload before the general `Propagation` one.
+  /** REQUIRES_NEW runs on its OWN connection; its outcome is an `Independent<T,E>` — a value you
+   *  inspect (`.ok`/`.value`/`.error`), NOT something to `return` directly from the outer work.
+   *  `return inner` is a compile error (the error points at the outer `withTransaction(...)` call,
+   *  not the return line). To propagate the inner outcome as the outer's, `return settle(inner)`
+   *  consciously; to commit the outer regardless, `return ok(inner)`. */
   withTransaction<T, E>(
     propagation: 'REQUIRES_NEW',
     work: TransactionWork<T, E>,
   ): Promise<Independent<T, E | DrizzleTxError>>;
+  /** REQUIRES_NEW runs on its OWN connection; its outcome is an `Independent<T,E>` — a value you
+   *  inspect (`.ok`/`.value`/`.error`), NOT something to `return` directly from the outer work.
+   *  `return inner` is a compile error (the error points at the outer `withTransaction(...)` call,
+   *  not the return line). To propagate the inner outcome as the outer's, `return settle(inner)`
+   *  consciously; to commit the outer regardless, `return ok(inner)`. */
   withTransaction<T, E>(
     propagation: 'REQUIRES_NEW',
     options: TxOptions,

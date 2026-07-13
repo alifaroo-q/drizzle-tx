@@ -57,6 +57,8 @@ await manager.withTransaction(Propagation.RequiresNew, async () => {
 });
 ```
 
+> **REQUIRES_NEW returns an `Independent<T,E>`, not a plain `Result`.** It ran on its own connection, so its outcome is a value you *inspect* (`.ok`/`.value`/`.error`) — `return inner` from the outer work **won't compile** (the guardrail against accidentally rolling the outer back on the inner's error). To propagate the inner outcome as the outer's, `return settle(inner)`; to commit the outer regardless, `return ok(inner)`. Note: the compile error lands on the outer `withTransaction(...)` call, not the offending `return` line — if you see it there, this is why.
+
 Or scope-based via explicit resource management (rolls back unless `commit()` — note a scope uses `scope.tx` explicitly and does **not** set the ALS context):
 
 ```ts
