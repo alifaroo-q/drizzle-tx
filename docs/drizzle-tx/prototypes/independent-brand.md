@@ -1,5 +1,7 @@
 # Prototype + decision: `Independent<Result>` brand for REQUIRES_NEW (E3, #31)
 
+> **Status: implemented** on `main` — `Independent`/`NonIndependent`/`settle` in [`packages/core/src/result.ts`](../../../packages/core/src/result.ts), poisoned `TransactionWork` in [`propagation-plan.ts`](../../../packages/core/src/propagation-plan.ts), branded `'REQUIRES_NEW'` overloads in [`transaction-manager.ts`](../../../packages/core/src/transaction-manager.ts); guardrails in [`independent-brand.test-d.ts`](../../../packages/core/test/types/independent-brand.test-d.ts). Plan: [`docs/plans/2026-07-13-independent-brand-and-export-surface.md`](../../plans/2026-07-13-independent-brand-and-export-surface.md). The record below is the original spike/decision.
+
 Throwaway type-level spike confirming E3's fix. **Decision (HITL #31): adopt the type-level brand**, named `Independent<T,E>` with a `settle()` unwrap. Verified by a clean `tsc --noEmit --strict` pass (both `@ts-expect-error` directives used). Blocks #32 (E4) — that ticket must export the branded REQUIRES_NEW signature.
 
 ## The footgun (E3)

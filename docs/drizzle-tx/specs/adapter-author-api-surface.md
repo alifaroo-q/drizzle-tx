@@ -1,5 +1,7 @@
 # Spec: adapter-author API surface — exported `WithTransaction<TClient>` + a deliberate export list (E4 + E5)
 
+> **Status: implemented** on `main` — E4 `WithTransaction<TClient>` exported from [`packages/core/src/index.ts`](../../../packages/core/src/index.ts) and nestjs [`TransactionHost`](../../../packages/nestjs/src/transaction-host.ts) collapsed to a bound field; E5 two-tier surface enumerated (no `export *`); `assertNever` dropped from both public barrels. Co-landed with the [#31 brand](../prototypes/independent-brand.md). Plan: [`docs/plans/2026-07-13-independent-brand-and-export-surface.md`](../../plans/2026-07-13-independent-brand-and-export-surface.md).
+
 Resolves issue [#32](https://github.com/alifaroo-q/drizzle-tx/issues/32) (audit-03 gaps **E4** + **E5**). Deliverable per the wayfinder map [#19](https://github.com/alifaroo-q/drizzle-tx/issues/19): **the spec** — the exported adapter-author type + the deliberate `@drizzle-tx/core` export surface. **The build is execution** (co-sequenced with the [#31 `Independent` brand](../prototypes/independent-brand.md) impl — see §0).
 
 Design forks decided HITL (#32, prototype ticket):
@@ -15,7 +17,7 @@ This is the base every framework adapter (Next.js / tRPC / Hono) builds on. Audi
 
 ## §0 — Co-sequencing with the #31 brand (read first)
 
-The [#31 `Independent<T,E>` brand](../prototypes/independent-brand.md) is **adopted but not yet in code**. It changes the `withTransaction` overload set: the `'REQUIRES_NEW'` **literal** overload returns `Promise<Independent<T, E | DrizzleTxError>>`; every other form returns plain `Promise<Result<T, E | DrizzleTxError>>`. Because E4 is an **indexed alias** off the manager (§1), the branded overload set lives in exactly one place — the manager class — and `WithTransaction` follows automatically.
+The [#31 `Independent<T,E>` brand](../prototypes/independent-brand.md) is **adopted and now implemented on `main`** (it landed together with this spec's E4/E5 work). It changes the `withTransaction` overload set: the `'REQUIRES_NEW'` **literal** overload returns `Promise<Independent<T, E | DrizzleTxError>>`; every other form returns plain `Promise<Result<T, E | DrizzleTxError>>`. Because E4 is an **indexed alias** off the manager (§1), the branded overload set lives in exactly one place — the manager class — and `WithTransaction` follows automatically.
 
 **Therefore this spec is written against the *target* (branded) manager overloads (§1.1), and E4 + the #31 brand impl land together as one execution unit.** Do not ship `WithTransaction` against the current (unbranded) overloads — it would be born stale.
 
