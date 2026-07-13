@@ -40,6 +40,13 @@ The NestJS-facing facade — the imperative `withTransaction()` API plus DI wiri
 **Propagation**:
 How a transactional method relates to an already-active transaction. v1 modes: **REQUIRED** (join or start), **REQUIRES_NEW** (independent new top-level transaction on its own connection), **NESTED** (savepoint within the current transaction).
 
+**Callback primitive** (`withTransaction(work)`):
+The default, flagship way to run a transaction — a callback with **implicit** propagation: the **transactional client** auto-joins the active transaction (via the `AsyncLocalStorage` context). Rollback-via-`err`.
+
+**Scope primitive** (`begin()` / `await using`):
+The advanced escape hatch — a block-scoped handle (`TransactionScope`, rollback-unless-`commit()`) with **explicit** propagation: you query through `scope.tx`; the **transactional client** does NOT auto-join (a scope sets no ALS context — `enterWith` is forbidden, ADR-0001). An opt-in `disposeTimeoutMs` leak backstop reclaims a forgotten scope (ADR-0014 R5).
+_Avoid_: calling the scope a "manual transaction" — it is the **scope primitive**.
+
 ### Errors
 
 **`DrizzleTxError`**:

@@ -92,6 +92,13 @@ export class TransactionManager<TClient> {
    *  scope's lifetime (like a manual `BEGIN`), so pool-sizing/deadlock caveats apply (ADR-0002).
    *  NOTE (R1, ADR-0012): a `commit()`ed scope can still fail at COMMIT (deferred-constraint /
    *  serialization); that settle failure is surfaced via the logger, not as a Result here.
+   *  REACTABILITY (E6, ADR-0014): because a scope commit-failure is logged and not returned,
+   *  use `withTransaction(work)` — whose return surfaces the classified error — when you need to
+   *  *react* to a commit failure as a `Result`. The scope is the explicit-`scope.tx` escape hatch;
+   *  it opts out of implicit propagation (no ALS context).
+   *  BACKSTOP (R5, ADR-0014): a `disposeTimeoutMs` (per-call, or a manager default) reclaims a
+   *  *forgotten* scope — forced rollback + release + loud warn. Default OFF; prefer `await using`
+   *  so disposal is guaranteed and the backstop never fires.
    *
    *  ```ts
    *  const opened = await manager.begin();

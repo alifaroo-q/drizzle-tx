@@ -69,6 +69,22 @@ await scope.tx.insert(users).values({ name: 'Ada' });
 scope.commit();                                          // omit → rollback on scope exit
 ```
 
+### Two primitives: callback vs scope
+
+There are exactly two ways to run a transaction, and they differ in **who joins it** (ADR-0014 E1):
+
+| | `withTransaction(work)` — **callback** | `begin()` / `await using` — **scope** |
+|---|---|---|
+| Propagation | **implicit** — the injected `db` proxy auto-joins the active tx | **explicit** — query through `scope.tx`; the proxy does **not** auto-join |
+| Shape | callback; `REQUIRED`/`REQUIRES_NEW`/`NESTED` | block-scoped handle, rollback-unless-`commit()` |
+| Use it for | the default — and the flagship path every adapter builds on | the advanced escape hatch when you need a block scope |
+
+**Choosing the scope opts out of implicit propagation** — inside an `await using` scope the injected `db` proxy still resolves to the *base* client (no ALS context is set; `enterWith` is forbidden, ADR-0001), so you must pass `scope.tx` to your queries. If you want implicit propagation, use `withTransaction`.
+
+**Commit-failure reactability (E6):** a scope `commit()` that fails at dispose is **logged, not returned** (disposal never throws). When you need to *react* to a commit failure as a `Result`, use `withTransaction` — its return surfaces the classified error (ADR-0012 R1).
+
+**`disposeTimeoutMs` — a leak backstop, not a work deadline (ADR-0014 R5):** opt-in and **default OFF**. When set (`begin({ disposeTimeoutMs })` per-call, or `new TransactionManager(adapter, { disposeTimeoutMs })` as a default), a *forgotten* scope that is never disposed is reclaimed after the timeout — forced default-deny rollback, connection released, a loud warning — so a leaked scope can't pin a pooled connection forever. It is a safety net for a bug, not a deadline for slow work: the primary defense is **`await using`**, which guarantees disposal, so prefer it over a bare `begin()` and the backstop should never fire.
+
 ### `createDrizzleTx` — the canonical assembly path
 
 The wiring above (manager + adapter + transactional client) collapses into one factory. Every surface (the NestJS adapter today; tRPC / Next next) builds on it, so defaults can't drift between them:
