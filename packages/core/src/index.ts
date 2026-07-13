@@ -15,6 +15,11 @@ export * from './logger.js';
 export * from './options.js';
 export * from './propagation.js';
 export * from './result.js';
+
+import type { TransactionManager as _TM } from './transaction-manager.js';
+/** @remarks Adapter-author API. The `withTransaction` overload contract (incl. the REQUIRES_NEW
+ *  `Independent` brand) — reference this instead of re-declaring the overloads when wrapping the manager. */
+export type WithTransaction<TClient> = _TM<TClient>['withTransaction'];
 export {
   TransactionManager,
   type TransactionManagerOptions,

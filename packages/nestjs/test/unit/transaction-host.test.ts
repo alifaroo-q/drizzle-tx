@@ -49,13 +49,15 @@ it('begin forwards options to the manager and returns its Result', async () => {
   expect(result).toEqual({ ok: true, value: scope });
 });
 
-it('withTransaction forwards its variadic args to the manager', async () => {
+it('withTransaction forwards its args to the manager', async () => {
   const { manager, calls } = makeFakeManager();
   const host = new TransactionHost(manager);
   const work = vi.fn();
 
   await host.withTransaction(work);
-  expect(calls.withTransaction).toEqual([[work, undefined, undefined]]);
+  // Bound directly to manager.withTransaction, so only the args actually passed are forwarded
+  // (the old variadic impl padded to [work, undefined, undefined]).
+  expect(calls.withTransaction).toEqual([[work]]);
 });
 
 it('registers itself so TransactionHost.get() resolves the instance', () => {
