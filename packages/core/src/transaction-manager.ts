@@ -4,7 +4,7 @@ import { consoleLogger, type TxLogger } from './logger.js';
 import type { TxOptions } from './options.js';
 import type { Propagation } from './propagation.js';
 import { normalizeArgs, planTransaction, type TransactionWork } from './propagation-plan.js';
-import { err, ok, type Result } from './result.js';
+import { err, type Independent, ok, type Result } from './result.js';
 import { classifyRollback, toThrowable } from './rollback-boundary.js';
 import { TransactionContext } from './transaction-context.js';
 import { openScope, type TransactionScope } from './transaction-scope.js';
@@ -36,7 +36,18 @@ export class TransactionManager<TClient> {
   /** NOTE (R1, ADR-0012): a work fn returning `ok(value)` can still resolve to `err(...)` —
    *  COMMIT runs inside the transaction boundary, so a deferred-constraint or serialization
    *  failure at commit surfaces as the classified variant (e.g. SerializationFailure at commit). */
-  // Overloads mirror the imperative API.
+  // Overloads mirror the imperative API. REQUIRES_NEW literals come FIRST so a literal
+  // argument resolves to the branded overload before the general `Propagation` one.
+  withTransaction<T, E>(
+    propagation: 'REQUIRES_NEW',
+    work: TransactionWork<T, E>,
+  ): Promise<Independent<T, E | DrizzleTxError>>;
+  withTransaction<T, E>(
+    propagation: 'REQUIRES_NEW',
+    options: TxOptions,
+    work: TransactionWork<T, E>,
+  ): Promise<Independent<T, E | DrizzleTxError>>;
+  // every other form → plain Result:
   withTransaction<T, E>(work: TransactionWork<T, E>): Promise<Result<T, E | DrizzleTxError>>;
   withTransaction<T, E>(
     propagation: Propagation,
