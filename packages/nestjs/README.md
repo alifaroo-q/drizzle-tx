@@ -4,6 +4,8 @@ The NestJS 11 adapter for [`@drizzle-tx`](https://github.com/) — Spring-`@Tran
 
 Built on [`@drizzle-tx/core`](https://www.npmjs.com/package/@drizzle-tx/core). Explicit `Result` model — it never throws for modeled conditions.
 
+> **Pre-1.0:** `0.x` minors may contain breaking changes (each documented in `CHANGELOG.md`). Support floor: Node ≥ 22.13. See [STABILITY.md](../../STABILITY.md).
+
 ## Install
 
 ```bash

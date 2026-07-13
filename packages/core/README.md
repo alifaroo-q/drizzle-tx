@@ -4,6 +4,8 @@ The framework-agnostic transaction engine behind [`@drizzle-tx`](https://github.
 
 Ships **ESM + CJS** with an explicit `Result` model — it never throws for modeled conditions.
 
+> **Pre-1.0:** `0.x` minors may contain breaking changes (each documented in `CHANGELOG.md`). Support floor: Node ≥ 22.13. See [STABILITY.md](../../STABILITY.md).
+
 ## Install
 
 ```bash
