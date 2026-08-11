@@ -56,6 +56,8 @@ if (isFailure(b)) return b;
 
 The evidence is decisive: `Billy-s-Garage-BE` **built 40 combinators and uses 0** — real authors reach for `await` + `if (isFailure) return`, not `.andThen`/`.map` chains or generator do-notation.
 
+> **Correction (2026-08-11).** "Uses 0" is wrong in kind. Re-measured against the backend, `ResultKit` carries **39 static methods**, and **six are called outside the kit** — `fail`, `success`, `isFailure`, `isSuccess`, `failure`, `unwrap`. All six construct a result or test one; **every method that composes two results is used zero times** (`map`, `andThen`, `match`, `combine`, `tap`, `orElse`, `bimap`, `mapError`, `flatten`, `fromPromise`, `partition`, and their async twins). The decision stands and the reasoning is unchanged — the unused half is exactly the composition half — but the claim as written says nothing was used, and that is not true. The call counts above are left at their measured-at-the-time values.
+
 **Be honest about the cost.** This is verbose, and the verbosity is an **accepted cost of the Result-native surface (b)**, not a solved problem. The escape valve — the throw-native app-dev edge (a) where you write ordinary `try`/`throw` — is a **flagship/future** deliverable ([ADR-0009](0009-framework-adapters-node-only-and-result-throw-bridge.md)). So **today the NestJS service author eats the verbosity**: they are on surface (b) and the bridge that would relieve them is not yet shipped. We state this plainly in the docs; we do not imply combinators make it ergonomic (they were tried and abandoned) nor that the throw-edge already rescues it (it doesn't, yet).
 
 ### Rider Q2 (`setRollbackOnly` / mark-for-rollback) — **rejected, out of scope**
