@@ -2,6 +2,16 @@
 
 A framework-agnostic Drizzle ORM transaction manager built on Node `AsyncLocalStorage`, with a NestJS adapter. It gives Spring-`@Transactional`-style implicit transaction propagation so the transaction handle never has to be prop-drilled.
 
+## Principle
+
+v1 gives the Drizzle apps people actually run implicit transaction propagation. Wrap a unit of work once and every query in its call tree joins one transaction. Reach is the yardstick, framework reach first and driver reach second. Full rationale in ADR-0015.
+
+**Drop-in test.** An app adopts with no rewrite only if repositories keep their signatures, its error handling is untouched, and setup is one assembly call plus wrapping units of work.
+
+**Gate.** A capability enters the default surface only if it works on every supported driver and framework adapter, a user can adopt without knowing it exists, and the headline or drop-in test needs it. Anything else is opt-in and must not shape the **adapter** port, the **assembly** path or the default error contract. An adapter's wrap point is exempt, because it is that adapter's spelling of `withTransaction`.
+
+**Pre-1.0.** No compatibility layer. Change the public API directly.
+
 ## Language
 
 ### Clients & transactions
